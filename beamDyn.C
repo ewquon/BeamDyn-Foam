@@ -1,5 +1,9 @@
 #include "beamDyn.H"
-#include "beamDynInterface.H"
+#include "beamDynFortranInterface.H" // define Fortran functions
+
+#include "fvCFD.H"
+
+#include <limits>
 
 namespace BD
 {
@@ -99,6 +103,92 @@ namespace BD
 //        }
 
         Info<< "BeamDyn initialization complete.\n\n";
+    }
+
+    //*********************************************************************************************
+
+    void readInputs( const dynamicFvMesh& mesh, 
+                     const IOdictionary& couplingProperties,
+                     Switch fluidSolve,
+                     Switch beamSolve )
+    {
+        // Read interface patch info
+        // TODO: only one interface patch for now
+
+        beamSolve = 1;
+        couplingProperties.lookup("interfacePatch") >> patchName;
+        patchID = mesh.boundaryMesh().findPatchID(patchName);
+        Info<< "  Found interfacePatchID for " << patchName 
+            << " : " << patchID << endl;
+
+        if (patchID < 0)
+        {
+            //FatalErrorIn(args.executable())
+            //    << "Problem with finding interface patch"
+            //    << abort(FatalError);
+            Info<< "Problem with finding interface patch" << endl;
+            //Foam::error::abort();
+            beamSolve = 0;
+        }
+
+        // Read reference values
+
+        //dimensionedScalar 
+        //rhoRef( 
+        //        "rhoRef", dimDensity, 
+        //        couplingProperties.lookupOrDefault<scalar>("rhoRef",1.0) 
+        //);
+        //scalar rhoRef( couplingProperties.lookupOrDefault<scalar>("rhoRef",1.0) );
+        rhoRef = couplingProperties.lookupOrDefault<scalar>("rhoRef",1.0);
+        pRef = readScalar(mesh.solutionDict().subDict("PIMPLE").lookup("pRefValue"));
+        Info<< "  Reference density  : " << rhoRef << endl;
+        Info<< "  Reference pressure : " << pRef << endl;
+
+        //label bladeDir( couplingProperties.lookupOrDefault<label>("bladeDir",0) );
+        bladeDir = couplingProperties.lookupOrDefault<label>("bladeDir",0);
+        Info<< "  Blade axis : " << bladeDir << endl;
+
+        twoD = couplingProperties.lookupOrDefault<Switch>("twoD",0);
+        Info<< "  Constrain rotation to about the blade axis (2D) : " << twoD << endl;
+
+        //scalar bladeR( couplingProperties.lookupOrDefault("R",-1) );
+        //scalar bladeR0( couplingProperties.lookupOrDefault("R0",-1) );
+        bladeR0 = couplingProperties.lookupOrDefault<scalar>("R0",-1); // default < 0 : use minimum input r value
+        bladeR  = couplingProperties.lookupOrDefault<scalar>("R",-1);
+
+        //dimensionedVector
+        //origin( 
+        //        "origin", dimLength, 
+        //        couplingProperties.lookupOrDefault<vector>("origin",vector::zero)
+        //);
+        //vector origin( couplingProperties.lookupOrDefault<vector>("origin",vector::zero) );
+        origin = couplingProperties.lookupOrDefault<vector>("origin",vector::zero);
+        Info<< "  Origin (rotation/moment reference) : " << origin << endl;
+
+        //scalar loadMultiplier( couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0) );
+        loadMultiplier = couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0);
+        Info<< "  Load multiplier (FOR DEVELOPMENT) : " << loadMultiplier << endl;
+
+        fluidSolve = couplingProperties.lookupOrDefault<Switch>("fluidSolve",1);
+        if(beamSolve) beamSolve = couplingProperties.lookupOrDefault<Switch>("beamSolve",1);
+        if(!fluidSolve) Info<< "  SKIPPING fluid solution" << endl;
+        if(!beamSolve) Info<< "  SKIPPING structural dynamics solution" << endl;
+
+        prescribed_max_deflection = couplingProperties.lookupOrDefault<vector>
+        (
+            "prescribed_max_deflection",
+            vector::zero
+        );
+        prescribed_max_rotation = couplingProperties.lookupOrDefault<vector>
+        (
+            "prescribed_max_rotation",
+            vector::zero
+        );
+        Info<< "  Prescribed max deflection (when beamSolve==0): " 
+            << prescribed_max_deflection << endl;
+        Info<< "  Prescribed max rotation   (when beamSolve==0): " 
+            << prescribed_max_rotation << endl;
+        prescribed_max_rotation *= Foam::constant::mathematical::pi/180;
     }
 
     //*********************************************************************************************
@@ -385,7 +475,7 @@ namespace BD
 
     void calculateShapeFunctions( const pointField& pf )
     {
-        nSurfNodes = pf.size();
+        int nSurfNodes = pf.size(); // number of local points on interface patch
         h_ptr = new double[nSurfNodes*nnodes];
         //double &h = *h_ptr;
 
@@ -480,8 +570,8 @@ namespace BD
 
         // setup arrays, pointers
         double r0, r1;
-        const polyPatch& bladePatch = mesh.boundaryMesh()[interfacePatchID];
-        const vectorField& bladePatchNormals = mesh.Sf().boundaryField()[interfacePatchID];
+        const polyPatch& bladePatch = mesh.boundaryMesh()[patchID];
+        const vectorField& bladePatchNormals = mesh.Sf().boundaryField()[patchID];
 
         // calculate shear stress
         //   note: devReff returns the effective stress tensor including the laminar stress
@@ -506,7 +596,7 @@ namespace BD
         //vectorField bladePatchShearStress = 
         //    mesh.Sf().boundaryField()[interfacePatchID]
         //    & Reff.boundaryField()[interfacePatchID];
-        vectorField bladePatchShearStress( bladePatchNormals & Reff.boundaryField()[interfacePatchID] );
+        vectorField bladePatchShearStress( bladePatchNormals & Reff.boundaryField()[patchID] );
 
         //
         // --loop over nodes in the BeamDyn blade model, assumed single element
@@ -540,7 +630,7 @@ namespace BD
                     vector Sf( bladePatchNormals[faceI] ); // surface normal
                     vector dm( rc - origin );
 
-                    vector dFp = rhoRef * Sf * (p.boundaryField()[interfacePatchID][faceI] - p0) / dr;
+                    vector dFp = rhoRef * Sf * (p.boundaryField()[patchID][faceI] - p0) / dr;
                     Fp += dFp;
                     Mp += dm ^ dFp;
 
@@ -563,8 +653,10 @@ namespace BD
             {
                 for (int i=0; i<3; ++i) 
                 {
-                    Ftot[i] = loadMultiplier*(Fp[i] + Fv[i]);
-                    Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
+                    Ftot[i] = Fp[i] + Fv[i];
+                    Mtot[i] = Mp[i] + Mv[i];
+                    //Ftot[i] = loadMultiplier*(Fp[i] + Fv[i]);
+                    //Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
                 }
 
                 // Update F_foam and M_foam in BeamDyn library
