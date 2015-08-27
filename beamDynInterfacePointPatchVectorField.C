@@ -29,8 +29,9 @@ License
 #include "Time.H"
 #include "polyMesh.H"
 #include "displacementMotionSolver.H"
+#include "vectorList.H"
 
-//#include "beamDyn.H" // BD namespace
+#include "beamDynInterface.H" // BD namespace
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -119,9 +120,9 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //    double ang;
 //    double tmpx[3], tmpy[3], tmpz[3];
 
-    vectorList& disp = BD::disp();  // linear displacement
-    vectorList& adisp = BD::adisp(); // angular displacement
-    Info<< "- with linear displacement : " << disp << endl;
+    vectorList& disp  = BD::linDisp();  // linear displacement
+    vectorList& adisp = BD::angDisp(); // angular displacement
+    Info<< "- with linear displacement  : " << disp << endl;
     Info<< "- with angular displacement : " << adisp << endl;
 
     //
@@ -132,14 +133,14 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
         // get displacement from pre-calculated shape function
         u = vector::zero;
         a = vector::zero;
-        for( int inode=0; inode<BD::nnodes; ++inode )
+        for( int inode=0; inode<BD::N(); ++inode )
         {
             for( int i=0; i<3; ++i )
             {
                 u.component(i) += 
-                    BD::h()[ptI*BD::nnodes+inode] * disp[inode].component(i);
+                    BD::h()[ptI*BD::N()+inode] * disp[inode].component(i);
                 a.component(i) += 
-                    BD::h()[ptI*BD::nnodes+inode] * adisp[inode].component(i);
+                    BD::h()[ptI*BD::N()+inode] * adisp[inode].component(i);
             }
         }
 
@@ -159,7 +160,7 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        this->operator[](ptI).component(2) += tmpx[2];
 /////////////////////////////////////////////////////////////////////
 
-        if(BD::twoD) this->operator[](ptI).component(BD::bladeDir) = 0.0;
+        if(BD::enforce2D()) this->operator[](ptI).component(BD::bladeDirection()) = 0.0;
 
     }
 

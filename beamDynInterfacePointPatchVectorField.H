@@ -28,6 +28,7 @@ Description
     Foam::beamDynInterfacePointPatchVectorField
 
     Created from oscillatingDisplacementPointPatchVectorField
+    Originally in src/fvMotionSolver/pointPatchFields/derived/beamDynInterface
 
 SourceFiles
     beamDynInterfacePointPatchVectorField.C
@@ -38,8 +39,6 @@ SourceFiles
 #define beamDynInterfacePointPatchVectorField_H
 
 #include "fixedValuePointPatchField.H"
-
-#include "beamDyn.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,9 +57,6 @@ class beamDynInterfacePointPatchVectorField
 
     // Private data
 
-//        vector amplitude_;
-//        scalar omega_;
-    
 public:
 
     //- Runtime type information
