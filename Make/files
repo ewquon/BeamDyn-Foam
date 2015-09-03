@@ -2,4 +2,4 @@ beamDynInterface/beamDyn.C
 
 beamDynInterfacePointPatch/beamDynInterfacePointPatchVectorField.C
 
-LIB = $(FOAM_LIBBIN)/BeamDynInterface
+LIB = $(FOAM_LIBBIN)/libBeamDynInterface

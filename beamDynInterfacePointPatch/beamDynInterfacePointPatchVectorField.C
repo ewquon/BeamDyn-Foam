@@ -108,17 +108,16 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
         return;
     }
 
+    //- patch coordinates, if needed
     //const labelList& meshPoints = patch().meshPoints(); // returns polyPatch_.meshPoints(), i.e. node IDs
-    const pointField& localPoints = patch().localPoints(); // returns polyPatch_.localPoints(), i.e. node coords
+    //const pointField& localPoints = patch().localPoints(); // returns polyPatch_.localPoints(), i.e. node coords
 
-    const polyMesh& mesh = this->dimensionedInternalField().mesh()();
-    const Time& t = mesh.time();
+    //- current time, if needed
+    //const polyMesh& mesh = this->dimensionedInternalField().mesh()();
+    //const Time& t = mesh.time();
 
     vector u(vector::zero);
     vector a(vector::zero);
-//    vector v(vector::zero);
-//    double ang;
-//    double tmpx[3], tmpy[3], tmpz[3];
 
     vectorList& disp  = BD::linDisp();  // linear displacement
     vectorList& adisp = BD::angDisp(); // angular displacement

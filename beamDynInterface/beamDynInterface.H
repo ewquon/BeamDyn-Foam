@@ -44,7 +44,9 @@ namespace BD
     void update( double t, double dt );
     void updatePrescribedDeflection( double t );
 
-    void updateNodePositions(); // NOT USED?
+    void updateNodePositions();
+
+    void write( bool writeNow, std::string timeName );
 
     void stop();
 
