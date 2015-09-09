@@ -198,10 +198,11 @@ namespace BD
     void stop()
     {
         Info<< "================================" << endl;
-        Info<< "| Stopping BeamDyn" << endl;
-        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
+        Info<< "Stopping BeamDyn" << endl;
+        Info<< "================================\n" << endl;
+        //Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
         if(Pstream::master()) beamDynStop();
-        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
+        //Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
 
         delete pos0_ptr;
         delete rot0_ptr;
@@ -534,10 +535,6 @@ namespace BD
                              const double* M )
     {
         if (!Pstream::master()) return;
-        Info<< "Setting constant sectional loads"
-            << " F: [" << F[0] << " " << F[1] << " " << F[2] << "]"
-            << " M: [" << M[0] << " " << M[1] << " " << M[2] << "]"
-            << endl;
 
         // for safety, define new variables to pass
         double Ftot[3], Mtot[3];
