@@ -76,7 +76,7 @@ namespace BD
             Info<< "Initial linear/angular position:" << endl;
             for( int inode=0; inode < nnodes; ++inode )
             {
-                beamDynGetInitNode0Position( &inode, posi, roti );
+                beamDynGetInitialNode0Position( &inode, posi, roti );
                 for(int i=0; i < 3; ++i) {
                     (*pos0_ptr)[inode][i] = posi[i];
                     (*rot0_ptr)[inode][i] = roti[i];
@@ -84,6 +84,7 @@ namespace BD
                 Info<< " " << posi[0] 
                     << " " << posi[1] 
                     << " " << posi[2]
+                    << "  "
                     << " " << 180/pi*roti[0] 
                     << " " << 180/pi*roti[1] 
                     << " " << 180/pi*roti[2]
@@ -347,8 +348,6 @@ namespace BD
     // - writes displacement at the starting time step to disp.out
     void updateNodePositions()
     {
-        Info<< "Updating node positions from BeamDyn" << endl;
-
         scalarList &r    = *r_ptr;
         vectorList &pos0 = *pos0_ptr;
         //vectorList &rot0 = *rot0_ptr; // not used
@@ -378,17 +377,6 @@ namespace BD
                 //   => this returns the wrong angular displacement at the zeroth step
                 //      but is this ever used???
                 beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
-// DEBUG
-//                Info<< "node " << inode << " : lin_disp " 
-//                    << "(" << lin_disp[0] << " " << lin_disp[1] << " " << lin_disp[2] << ")" 
-//                    << endl;
-
-// 2D operation, e.g. wingMotion case
-//                ang = ang_disp[0];   // positive is nose up
-//                disp[inode].component(0) = 0.0;                                                      // assume no spanwise deformation (in 2D)
-//                disp[inode].component(2) =  lin_disp[2]*Foam::cos(ang) + lin_disp[1]*Foam::sin(ang); // chordwise (TE->LE) displacement
-//                disp[inode].component(1) = -lin_disp[2]*Foam::sin(ang) + lin_disp[1]*Foam::cos(ang); // normal displacement
-//                r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
 
 // ROTATION SHOULD BE APPLIED FOR THE POINTS ON THE INTERFACE PATCH!!!
 //                beamDynGetNode0RotationMatrix( &inode, R );
@@ -417,24 +405,6 @@ namespace BD
 
                 // used for sectional loads calculation
                 r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
-
-// DEBUG
-//                Info<< "DEBUG node " << inode << " (lin_disp) :" 
-//                    << " " << lin_disp[0]
-//                    << " " << lin_disp[1]
-//                    << " " << lin_disp[2]
-//                    << endl;
-//                Info<< "DEBUG node " << inode << " (OLD) :" 
-//                    << " " << 0.0
-//                    << " " << -lin_disp[2]*Foam::sin(ang_disp[0]) + lin_disp[1]*Foam::cos(ang_disp[0]) // normal displacement
-//                    << " " <<  lin_disp[2]*Foam::cos(ang_disp[0]) + lin_disp[1]*Foam::sin(ang_disp[0]) // chordwise (TE->LE) displacement
-//                    << endl;
-//                Info<< "DEBUG node " << inode << " (NEW) :" 
-//                    << " " << disp[inode].component(0)
-//                    << " " << disp[inode].component(1)
-//                    << " " << disp[inode].component(2)
-//                    << endl;
-
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
                 {

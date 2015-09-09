@@ -36,19 +36,16 @@ extern "C"
     //
 
     void beamDynGetNnodes( int *nnodes );
-    //void beamDynGetDispAtNode( int *ispan, double *lin_disp, double *ang_disp );        // deprecated
     void beamDynGetNode0Displacement( int *ispan, double *lin_disp, double *ang_disp ); // get linear/angular DISPLACEMENT at node (0-indexed)
     void beamDynGetNode0Position( int *ispan, double *pos, double *rot );               // get position/rotation at node (0-indexed)
-    void beamDynGetInitNode0Position( int *ispan, double *pos0, double *rot0 );         // get initial position/rotation at node (0-indexed)
+    void beamDynGetInitialNode0Position( int *ispan, double *pos0, double *rot0 );      // get initial position/rotation at node (0-indexed)
     void beamDynGetNode0RotationMatrix( int *ispan, double *R );                        // get rotation matrix[9], stored row-wise
 
     void beamDynGetShapeFunctions( double *s, double *hx );
 
-
-    // deprecated:
-    //void beamDynGetDisp( int *N, double *s, double *u, double *v, double *w, double *kx, double *ky, double *kz );
-
     // shouldn't be needed:
+    //void beamDynGetDispAtNode( int *ispan, double *lin_disp, double *ang_disp );
+    //void beamDynGetDisp( int *N, double *s, double *u, double *v, double *w, double *kx, double *ky, double *kz );
     //void beamDynGetNgp( int *ngp );
     //void beamDynGetGLLPts( double *gllp, double *gllw );
     //void beamDynGetGaussPts( double *gp, double *gw );
