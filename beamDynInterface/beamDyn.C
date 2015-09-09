@@ -21,11 +21,12 @@ namespace BD
         if (Pstream::master())
         {
             Info<< "\n================================" << endl;
-            Info<< "| Starting BeamDyn" << endl;
-            Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
+            Info<<   "Starting BeamDyn" << endl;
+            Info<<   "================================\n" << endl;
+            //Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
             beamDynStart( &t0, &dt );
             beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
-            Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+            //Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
         }
 
         // initialize arrays for storing configuration
@@ -225,11 +226,11 @@ namespace BD
 //        Info<< "================================" << endl;
 //        Info<< "| Calling BeamDyn update" << endl;
 //        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
-        currentTime = t;
+        currentTime = t; // do we really need to save this?
         currentDeltaT = dt;
         if(Pstream::master()) 
         {
-            beamDynStep( &dt );
+            beamDynStep( &dt ); // NOTE: dt isn't actually used!
         }
 //        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << nl << endl;
         updateNodePositions();
@@ -528,6 +529,31 @@ namespace BD
     }
 
     //*********************************************************************************************
+
+    void updateSectionLoads( const double* F,
+                             const double* M )
+    {
+        if (!Pstream::master()) return;
+        Info<< "Setting constant sectional loads"
+            << " F: [" << F[0] << " " << F[1] << " " << F[2] << "]"
+            << " M: [" << M[0] << " " << M[1] << " " << M[2] << "]"
+            << endl;
+
+        // for safety, define new variables to pass
+        double Ftot[3], Mtot[3];
+        for( int i=0; i<3; ++i )
+        {
+            Ftot[i] = F[i];
+            Mtot[i] = M[i];
+        }
+
+        for( int ig=0; ig<nnodes-1; ++ig ) 
+        {
+            beamDynSetDistributedLoad(&ig, Ftot, Mtot);
+        }
+
+        first = false;
+    }
 
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 

@@ -37,6 +37,8 @@ namespace BD
     void start( double t0, double dt );
     void calculateShapeFunctions( const pointField& pf );
 
+    void updateSectionLoads( const double* F,  // set constant distributed load, for testing
+                             const double* M );
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence );

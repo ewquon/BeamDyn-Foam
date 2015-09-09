@@ -24,9 +24,8 @@ extern "C"
     // set functions
     //
 
-    //void beamDynSetDistributedLoadAtNode( int *inode0, double *F, double *M );
-    void beamDynSetDistributedLoad( int *ig, double *F, double *M );
-    void beamDynSetDisplacement( int *inode0, double *u );
+    void beamDynSetDistributedLoad( int *ig, double *F, double *M ); // set distributed load at 0-index gauss point
+    //void beamDynSetDisplacement( int *inode0, double *u );
 
     //void beamDynSetXRotationMatrix( int *inode0, double *ang );    // set the rotation matrix for rotation about x-axis; angle is in radians
     //void beamDynSetZRotationMatrix( int *inode0, double *ang );    // set the rotation matrix for rotation about z-axis; angle is in radians
