@@ -72,7 +72,7 @@ namespace BD
             loadFile.precision(8);
             dispFile.precision(8);
 
-            // get initial configuration
+            // get initial configuration (IN BEAMDYN COORDINATES)
             double posi[3], roti[3];
             Info<< "Initial linear/angular position:" << endl;
             for( int inode=0; inode < nnodes; ++inode )
@@ -531,6 +531,7 @@ namespace BD
 
     //*********************************************************************************************
 
+    // for testing...
     void updateSectionLoads( const double* F,
                              const double* M )
     {
@@ -544,8 +545,23 @@ namespace BD
             Mtot[i] = M[i];
         }
 
-        for( int ig=0; ig<nnodes-1; ++ig ) 
+        //for( int ig=0; ig<nnodes-1; ++ig ) 
+        //{
+        //    beamDynSetDistributedLoad(&ig, Ftot, Mtot);
+        //}
+
+        // Only update nodes at x>=0 
+        for( int ig=nnodes/2; ig<nnodes-1; ++ig )  // only set interior gauss pts
         {
+            //Info<< "gauss pt " << ig << " btwn "
+            //    << " " << (*pos0_ptr)[ig][0]
+            //    << " " << (*pos0_ptr)[ig][1]
+            //    << " " << (*pos0_ptr)[ig][2]
+            //    << " and "
+            //    << " " << (*pos0_ptr)[ig+1][0]
+            //    << " " << (*pos0_ptr)[ig+1][1]
+            //    << " " << (*pos0_ptr)[ig+1][2]
+            //    << endl;
             beamDynSetDistributedLoad(&ig, Ftot, Mtot);
         }
 
