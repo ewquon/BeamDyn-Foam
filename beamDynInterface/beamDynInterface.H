@@ -31,8 +31,8 @@ namespace BD
 
     void readInputs( const dynamicFvMesh& mesh, 
                      const IOdictionary& dict,
-                     Switch fluidSolve,
-                     Switch beamSolve );
+                     Switch& fluidSolve,
+                     Switch& beamSolve );
 
     void start( double t0, double dt );
     void calculateShapeFunctions( const pointField& pf );

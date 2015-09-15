@@ -16,5 +16,10 @@ IOdictionary couplingProperties
 Switch fluidSolve;
 Switch beamSolve;
 
-BD::readInputs(mesh,couplingProperties,fluidSolve,beamSolve);
+BD::readInputs(mesh,
+               couplingProperties,
+               fluidSolve,
+               beamSolve);
 
+Info<< "  fluid/beam solvers: " 
+    << fluidSolve << " " << beamSolve << endl;

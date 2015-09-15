@@ -30,11 +30,15 @@ namespace BD
 
     const scalar pi(Foam::constant::mathematical::pi);
     const scalar eps(1.0e-8);
+    const scalar radToDeg(180.0/pi);
 
     // inputs from couplingProperties
 
     word    patchName;
     label   patchID;
+
+    labelList  OFtoBD(3); // simple coordinate mappings
+    labelList  BDtoOF(3);
 
     label   bladeDir;
     scalar  bladeR0;
@@ -43,10 +47,11 @@ namespace BD
 
     Switch  twoD;
 
-    scalar  loadMultiplier; // scaling applied to aero loads, for development
- 
-    vector  prescribed_max_deflection; // only works for y deflections for now
-    vector  prescribed_max_rotation;   // only works for x rotations for now, overwrites bending rotation if specified
+    // debug inputs
+//    scalar  loadMultiplier; // scaling applied to aero loads, for development
+// 
+//    vector  prescribed_max_deflection; // only works for y deflections for now
+//    vector  prescribed_max_rotation;   // only works for x rotations for now, overwrites bending rotation if specified
 
     // coupling variables
 
@@ -63,10 +68,10 @@ namespace BD
     double  currentTime = -1;
     double  currentDeltaT = -1;
 
-    vectorList  *pos0_ptr,*rot0_ptr;    // starting position and orientation of beam nodes
-    vectorList  *pos_ptr, *rot_ptr;     // current position and orientation of beam nodes
-    vectorList  *disp_ptr;              // linear displacement at beam nodes
-    vectorList  *adisp_ptr;             // angular displacement at beam nodes
+    vectorList  *pos0_ptr,*rot0_ptr;    // starting position and orientation of beam nodes (BeamDyn coords)
+    vectorList  *pos_ptr, *rot_ptr;     // current position and orientation of beam nodes (BeamDyn coords)
+    vectorList  *disp_ptr;              // linear displacement at beam nodes (BeamDyn coords)
+    vectorList  *adisp_ptr;             // angular displacement at beam nodes (BeamDyn coords)
     scalarList  *r_ptr;                 // spanwise coordinates of beam nodes
     double      *h_ptr;                 // shape functions [ # CFD nodes * # BD nodes ]
 

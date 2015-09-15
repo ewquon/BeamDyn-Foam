@@ -1,0 +1,39 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.1                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      couplingProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+interfacePatch      blade;      // name of boundary patch
+
+bladeR              0.5;        // blade tip position (default: -1, determine from BeamDyn nodes)
+bladeR0             0;          // blade root position (default: -1, determine from BeamDyn nodes)
+bladeDir            0;          // blade direction in BeamDyn coordinates, 0/1/2 --> x/y/z (spanwise|normal|LE->TE)
+origin              (0 0 0);    // for calculating moments during sectional load update
+
+coordinateMapping   (2 0 1);    // swap axes to go from OpenFOAM to BeamDyn coordinates
+
+twoD                no;         // Set spanwise displacements to zero (default: false)
+
+rhoRef              1.0;        // (default: 1.0) Note: pRefValue is obtained from fvSolution
+
+
+
+
+// DEBUG/TESTING
+
+fluidSolve          on;         // Enable/disable fluid solve at each iteration
+beamSolve           on;         // Enable/disable structural solve at each iteration
+
+// ************************************************************************* //

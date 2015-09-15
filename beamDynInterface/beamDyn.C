@@ -22,11 +22,12 @@ namespace BD
         {
             Info<< "\n================================" << endl;
             Info<<   "Starting BeamDyn" << endl;
-            Info<<   "================================\n" << endl;
+            Info<<   "================================" << endl;
             //Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
             beamDynStart( &t0, &dt );
             beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
             //Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+            Info<< "...done\n" << endl;
         }
 
         // initialize arrays for storing configuration
@@ -55,6 +56,7 @@ namespace BD
                    
                 beamDynReadState( rstFile.c_str() );
 
+                // these outputs are in BeamDyn coordinates
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
                 dispFile.open("disp.out", std::ios::in | std::ios::out | std::ios::app);
             }
@@ -86,9 +88,9 @@ namespace BD
                     << " " << posi[1] 
                     << " " << posi[2]
                     << "  "
-                    << " " << 180/pi*roti[0] 
-                    << " " << 180/pi*roti[1] 
-                    << " " << 180/pi*roti[2]
+                    << " " << roti[0]*radToDeg
+                    << " " << roti[1]*radToDeg
+                    << " " << roti[2]*radToDeg
                     << endl;
             }
 
@@ -111,8 +113,8 @@ namespace BD
 
     void readInputs( const dynamicFvMesh& mesh, 
                      const IOdictionary& couplingProperties,
-                     Switch fluidSolve,
-                     Switch beamSolve )
+                     Switch& fluidSolve,
+                     Switch& beamSolve )
     {
         // Read interface patch info
         // TODO: only one interface patch for now
@@ -148,7 +150,16 @@ namespace BD
 
         //label bladeDir( couplingProperties.lookupOrDefault<label>("bladeDir",0) );
         bladeDir = couplingProperties.lookupOrDefault<label>("bladeDir",0);
-        Info<< "  Blade axis : " << bladeDir << endl;
+        Info<< "  Blade axis (beamdyn coords): " << bladeDir << endl;
+
+        vector coordMap = couplingProperties.lookupOrDefault<vector>("coordinateMapping",vector(0,1,2));
+        for( int i=0; i<3; ++i )
+        {
+            OFtoBD[i] = label(coordMap[i]);
+            BDtoOF[OFtoBD[i]] = i;
+        }
+        Info<< "  Coordinate mapping from OpenFOAM to BeamDyn : " << OFtoBD << endl;
+        Info<< "  Coordinate mapping from BeamDyn to OpenFoam : " << BDtoOF << endl;
 
         twoD = couplingProperties.lookupOrDefault<Switch>("twoD",0);
         Info<< "  Constrain rotation to about the blade axis (2D) : " << twoD << endl;
@@ -167,30 +178,30 @@ namespace BD
         origin = couplingProperties.lookupOrDefault<vector>("origin",vector::zero);
         Info<< "  Origin (rotation/moment reference) : " << origin << endl;
 
-        //scalar loadMultiplier( couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0) );
-        loadMultiplier = couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0);
-        Info<< "  Load multiplier (FOR DEVELOPMENT) : " << loadMultiplier << endl;
+        //loadMultiplier = couplingProperties.lookupOrDefault<scalar>("loadMultiplier",1.0);
+        //Info<< "  Load multiplier (FOR DEVELOPMENT) : " << loadMultiplier << endl;
 
         fluidSolve = couplingProperties.lookupOrDefault<Switch>("fluidSolve",1);
         if(beamSolve) beamSolve = couplingProperties.lookupOrDefault<Switch>("beamSolve",1);
-        if(!fluidSolve) Info<< "  SKIPPING fluid solution" << endl;
-        if(!beamSolve) Info<< "  SKIPPING structural dynamics solution" << endl;
+        //if(!fluidSolve) Info<< "  SKIPPING fluid solution" << endl;
+        //if(!beamSolve) Info<< "  SKIPPING structural dynamics solution" << endl;
 
-        prescribed_max_deflection = couplingProperties.lookupOrDefault<vector>
-        (
-            "prescribed_max_deflection",
-            vector::zero
-        );
-        prescribed_max_rotation = couplingProperties.lookupOrDefault<vector>
-        (
-            "prescribed_max_rotation",
-            vector::zero
-        );
-        Info<< "  Prescribed max deflection (when beamSolve==0): " 
-            << prescribed_max_deflection << endl;
-        Info<< "  Prescribed max rotation   (when beamSolve==0): " 
-            << prescribed_max_rotation << endl;
-        prescribed_max_rotation *= Foam::constant::mathematical::pi/180;
+        //prescribed_max_deflection = couplingProperties.lookupOrDefault<vector>
+        //(
+        //    "prescribed_max_deflection",
+        //    vector::zero
+        //);
+        //prescribed_max_rotation = couplingProperties.lookupOrDefault<vector>
+        //(
+        //    "prescribed_max_rotation",
+        //    vector::zero
+        //);
+        //Info<< "  Prescribed max deflection (when beamSolve==0): " 
+        //    << prescribed_max_deflection << endl;
+        //Info<< "  Prescribed max rotation   (when beamSolve==0): " 
+        //    << prescribed_max_rotation << endl;
+        //prescribed_max_rotation *= Foam::constant::mathematical::pi/180;
+
     }
 
     //*********************************************************************************************
@@ -406,6 +417,7 @@ namespace BD
                 }
 
                 // used for sectional loads calculation
+                // note: pos0 and disp are in BeamDyn coords
                 r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
@@ -415,18 +427,19 @@ namespace BD
                     Info<< " " << lin_disp[0] 
                         << " " << lin_disp[1] 
                         << " " << lin_disp[2]
-                        << " " << 180/pi*ang_disp[0] 
-                        << " " << 180/pi*ang_disp[1] 
-                        << " " << 180/pi*ang_disp[2] << endl;
+                        << " " << ang_disp[0]*radToDeg
+                        << " " << ang_disp[1]*radToDeg
+                        << " " << ang_disp[2]*radToDeg
+                        << endl;
                 }
                 else // write subsequent displacements to file
                 {
                     dispFile << " " << lin_disp[0] 
                              << " " << lin_disp[1] 
                              << " " << lin_disp[2];
-                    dispFile << " " << 180/pi*ang_disp[0] 
-                             << " " << 180/pi*ang_disp[1] 
-                             << " " << 180/pi*ang_disp[2];
+                    dispFile << " " << ang_disp[0]*radToDeg 
+                             << " " << ang_disp[1]*radToDeg 
+                             << " " << ang_disp[2]*radToDeg;
                 }
 
             }// loop over beam nodes
@@ -483,7 +496,8 @@ namespace BD
 
             forAll( pf, ptI )
             {
-                s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
+                //s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
+                s = ( pf[ptI].component(BDtoOF[bladeDir]) - bladeR0 ) / L_2 - 1.0;
                 smin = min(smin,s);
                 smax = max(smax,s);
                 //beamDynGetShapeFunctions( &s, hi ); // this only works on the master node...
@@ -634,7 +648,8 @@ namespace BD
             forAll( bladePatch, faceI )
             {
                 vector rc( bladePatch.faceCentres()[faceI] );
-                if( rc[bladeDir] >= r0 && rc[bladeDir] < r1 )
+                //if( rc[bladeDir] >= r0 && rc[bladeDir] < r1 )
+                if( rc[BDtoOF[bladeDir]] >= r0 && rc[BDtoOF[bladeDir]] < r1 )
                 {
                     vector Sf( bladePatchNormals[faceI] ); // surface normal
                     vector dm( rc - origin );
@@ -657,15 +672,17 @@ namespace BD
             Pstream::gather(Mp, sumOp<vector>());
             Pstream::gather(Mv, sumOp<vector>());
 
-            double Ftot[3], Mtot[3];
+            double Ftot[3], Mtot[3]; // these should be in BD coordinates
             if(Pstream::master())
             {
                 for (int i=0; i<3; ++i) 
                 {
-                    Ftot[i] = Fp[i] + Fv[i];
-                    Mtot[i] = Mp[i] + Mv[i];
                     //Ftot[i] = loadMultiplier*(Fp[i] + Fv[i]);
                     //Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
+                    //Ftot[i] = Fp[i] + Fv[i];
+                    //Mtot[i] = Mp[i] + Mv[i];
+                    Ftot[OFtoBD[i]] = Fp[i] + Fv[i];
+                    Mtot[OFtoBD[i]] = Mp[i] + Mv[i];
                 }
 
                 // Update F_foam and M_foam in BeamDyn library
