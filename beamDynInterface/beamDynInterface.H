@@ -48,7 +48,7 @@ namespace BD
 
     void updateNodePositions();
 
-    void write( bool writeNow, std::string timeName );
+    void write( std::string timeName, bool writeNow );
 
     void stop();
 
