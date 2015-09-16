@@ -17,6 +17,7 @@ namespace BD
     {
         currentTime = t0;
         currentDeltaT = dt;
+        bool restart = 0;
 
         if (Pstream::master())
         {
@@ -46,15 +47,31 @@ namespace BD
         {
             if (t0 > 0)
             {
-                Info<< "Time = " << t0 << ", attempting restart" << endl;
+                Info<< "Attempting restart from previous time = " << t0 << endl;
+
                 std::string rstFile("BeamDynState_" + Foam::Time::timeName(t0) + ".dat");
-                if (FILE *file = fopen(rstFile.c_str(), "r")) {
+                if (FILE *file = fopen(rstFile.c_str(), "r"))
+                {
                     fclose(file);
-                } else {
+                    restart = 1;
+                    beamDynReadState( rstFile.c_str() );
+                }
+
+                if( !restart ) // try different restart file
+                {
+                    std::string rstFile("BeamDynState_last.dat");
+                    if (FILE *file = fopen(rstFile.c_str(), "r"))
+                    {
+                        fclose(file);
+                        restart = 1;
+                        beamDynReadState( rstFile.c_str() );
+                    }
+                }
+
+                if( !restart ) 
+                {
                     Info<< "Problem opening restart file " << rstFile << endl;
-                }   
-                   
-                beamDynReadState( rstFile.c_str() );
+                }
 
                 // these outputs are in BeamDyn coordinates
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
@@ -107,6 +124,7 @@ namespace BD
 //        }
 
         Info<< "BeamDyn initialization complete.\n\n";
+
     }
 
     //*********************************************************************************************
@@ -211,6 +229,9 @@ namespace BD
         Info<< "================================" << endl;
         Info<< "Stopping BeamDyn" << endl;
         Info<< "================================\n" << endl;
+
+        if(Pstream::master()) beamDynWriteState("BeamDynState_last.dat");
+
         //Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
         if(Pstream::master()) beamDynStop();
         //Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
@@ -247,6 +268,7 @@ namespace BD
 //        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << nl << endl;
         updateNodePositions();
     }
+
     //*********************************************************************************************
 
 //    void updatePrescribedDeflection( double t )
@@ -338,7 +360,7 @@ namespace BD
 
     //*********************************************************************************************
 
-    void write( bool writeNow, std::string timeName )
+    void write( std::string timeName, bool writeNow=true )
     {
         if (!writeNow || !Pstream::master()) return;
 
