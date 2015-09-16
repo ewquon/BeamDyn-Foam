@@ -59,6 +59,7 @@ namespace BD
     scalar  pRef;
 
     bool first=true; // first iteration?
+    bool restarted=0;
 
     std::fstream loadFile;
     std::fstream dispFile;
@@ -83,7 +84,7 @@ namespace BD
     //-used by boundary patch
     vectorList& linDisp() { return *disp_ptr; };  // linear displacement
     vectorList& angDisp() { return *adisp_ptr; }; // angular displacement
-    //scalarList& r() { return *r_ptr; };         // beam coordinate, NOT USED?
+    //scalarList& r() { return *r_ptr; };           // beam coordinate at beamdyn nodes --NOT USED
     double* h() { return h_ptr; };                // shape functions
     label N() { return nnodes; };                 // number of beamdyn nodes
     Switch enforce2D() { return twoD; };          // force 2D displacements

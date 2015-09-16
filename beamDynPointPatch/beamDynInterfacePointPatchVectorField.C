@@ -108,16 +108,19 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
         return;
     }
 
+    vector u(vector::zero); // interpolated linear displacement
+    vector a(vector::zero); // interpolated angular displacement
+
+    double ang;
+    vector v(vector::zero); // additional displacement vector due to rotation
+
     //- patch coordinates, if needed
     //const labelList& meshPoints = patch().meshPoints(); // returns polyPatch_.meshPoints(), i.e. node IDs
-    //const pointField& localPoints = patch().localPoints(); // returns polyPatch_.localPoints(), i.e. node coords
+    const pointField& localPoints = patch().localPoints(); // returns polyPatch_.localPoints(), i.e. DISPLACED node coords
 
     //- current time, if needed
     //const polyMesh& mesh = this->dimensionedInternalField().mesh()();
     //const Time& t = mesh.time();
-
-    vector u(vector::zero);
-    vector a(vector::zero);
 
     vectorList& disp  = BD::linDisp();  // linear displacement in beamdyn coords
     vectorList& adisp = BD::angDisp(); // angular displacement in beamdyn coords
@@ -145,13 +148,10 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
             }
         }
 
-        this->operator[](ptI) = u;
-
 /////////////////////////////////////////////////////////////////////
-// TODO: general rotations, retrieve rotation matrix
-// TODO: account for origin not at (0 0 0)
-// x-rotation, quick
-//        ang = a.component(0);
+// TODO: general rotations, retrieve rotation matrix -- need VABS...
+/////////////////////////////////////////////////////////////////////
+        ang = a.component(BD::bladeDirection());
 //        v = localPoints[ptI] - BD::origin;
 //        tmpx[0] = v.component(0)                                                - localPoints[ptI].component(0);
 //        tmpx[1] = v.component(1)*Foam::cos(ang) - v.component(2)*Foam::sin(ang) - localPoints[ptI].component(1);
@@ -159,7 +159,9 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        this->operator[](ptI).component(0) += tmpx[0];
 //        this->operator[](ptI).component(1) += tmpx[1];
 //        this->operator[](ptI).component(2) += tmpx[2];
-/////////////////////////////////////////////////////////////////////
+
+        // Apply displacement
+        this->operator[](ptI) = u;
 
         if(BD::enforce2D()) this->operator[](ptI).component(BD::bladeDirection()) = 0.0;
 

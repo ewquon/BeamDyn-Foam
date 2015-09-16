@@ -17,7 +17,7 @@ namespace BD
     {
         currentTime = t0;
         currentDeltaT = dt;
-        bool restart = 0;
+        restarted = 0;
 
         if (Pstream::master())
         {
@@ -49,26 +49,27 @@ namespace BD
             {
                 Info<< "Attempting restart from previous time = " << t0 << endl;
 
-                std::string rstFile("BeamDynState_" + Foam::Time::timeName(t0) + ".dat");
+                //std::string rstFile("BeamDynState_" + Foam::Time::timeName(t0) + ".dat");
+                std::string rstFile(Foam::Time::timeName(t0) + "/BeamDynState.dat");
                 if (FILE *file = fopen(rstFile.c_str(), "r"))
                 {
                     fclose(file);
-                    restart = 1;
                     beamDynReadState( rstFile.c_str() );
+                    restarted = 1;
                 }
 
-                if( !restart ) // try different restart file
+                if( !restarted ) // try different restart file
                 {
                     std::string rstFile("BeamDynState_last.dat");
                     if (FILE *file = fopen(rstFile.c_str(), "r"))
                     {
                         fclose(file);
-                        restart = 1;
                         beamDynReadState( rstFile.c_str() );
+                        restarted = 1;
                     }
                 }
 
-                if( !restart ) 
+                if( !restarted ) 
                 {
                     Info<< "Problem opening restart file " << rstFile << endl;
                 }
@@ -364,7 +365,8 @@ namespace BD
     {
         if (!writeNow || !Pstream::master()) return;
 
-        std::string fname("BeamDynState_" + timeName + ".dat");
+        //std::string fname("BeamDynState_" + timeName + ".dat");
+        std::string fname(timeName + "/BeamDynState.dat");
         beamDynWriteState( fname.c_str() );
     }
 
@@ -487,6 +489,30 @@ namespace BD
         h_ptr = new double[nSurfNodes*nnodes];
         //double &h = *h_ptr;
 
+        // read/write shape function information
+        std::string fname("shape.dat");
+        if( Pstream::parRun() ) 
+        {
+            std::stringstream ss;
+            ss << "processor" << Pstream::myProcNo() << "/" << fname;
+            fname = ss.str();
+        }
+
+        if( restarted )
+        {
+            // Make sure we only calculate this at the beginning using the undeformed surface nodes
+            Info<< "Skipping shape function calculation for restarted simulation" << endl;
+
+            // read saved shape function
+            std::ifstream hFile(fname, std::ios::in | std::ios::binary);
+            //hFile.read((char *) &h_ptr, sizeof(h_ptr)); // C-style
+            hFile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
+
+            return;
+        }
+
+        std::ofstream hFile(fname, std::ios::out | std::ios::binary);
+
         scalarList &r = *r_ptr;
         if( bladeR0 < 0.0 ) bladeR0 = r[0];
         if( bladeR  < 0.0 ) bladeR  = r[nnodes-1];
@@ -554,8 +580,9 @@ namespace BD
                 {
                     h_ptr[ptI*nnodes + inode] = hi[inode];
                     hsum += hi[inode];
+
+                    hFile << hi[inode];
                 }
-                //Info<< hsum << endl; between 3 and 5?!?
                 hmin = min(hmin,hsum);
                 hmax = max(hmax,hsum);
 
@@ -563,7 +590,12 @@ namespace BD
 //            Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
 //                << " for s : [ " << smin << ", " << smax << " ]"
 //                << endl;
-        }
+
+        }//if nSurfNodes > 0
+
+        //hFile.write((char *) &h_ptr, sizeof(h_ptr)); // C-style
+        hFile.write( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
+
     }
 
     //*********************************************************************************************

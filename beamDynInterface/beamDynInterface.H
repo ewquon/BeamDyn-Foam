@@ -22,6 +22,7 @@ namespace BD
     //-used by boundary patch
     vectorList& linDisp();
     vectorList& angDisp();
+    //scalarList& r();
     double* h();
     label N();
     Switch enforce2D();
