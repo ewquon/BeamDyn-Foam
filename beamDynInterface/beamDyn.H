@@ -88,6 +88,7 @@ namespace BD
     label N() { return nnodes; };                 // number of beamdyn nodes
     Switch enforce2D() { return twoD; };          // force 2D displacements
     label bladeDirection() { return bladeDir; };
+    label openfoamDir(label dir) { return BDtoOF[dir]; };
 
 }
 

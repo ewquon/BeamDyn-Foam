@@ -26,6 +26,7 @@ namespace BD
     label N();
     Switch enforce2D();
     label bladeDirection();
+    label openfoamDir(label dir);
 
     // member functions
 

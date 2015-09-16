@@ -119,8 +119,8 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     vector u(vector::zero);
     vector a(vector::zero);
 
-    vectorList& disp  = BD::linDisp();  // linear displacement
-    vectorList& adisp = BD::angDisp(); // angular displacement
+    vectorList& disp  = BD::linDisp();  // linear displacement in beamdyn coords
+    vectorList& adisp = BD::angDisp(); // angular displacement in beamdyn coords
     Info<< "- with linear displacement  : " << disp << endl;
     Info<< "- with angular displacement : " << adisp << endl;
 
@@ -137,9 +137,11 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
             for( int i=0; i<3; ++i )
             {
                 u.component(i) += 
-                    BD::h()[ptI*BD::N()+inode] * disp[inode].component(i);
+                    //BD::h()[ptI*BD::N()+inode] * disp[inode].component(i);
+                    BD::h()[ptI*BD::N()+inode] * disp[inode].component(BD::openfoamDir(i));
                 a.component(i) += 
-                    BD::h()[ptI*BD::N()+inode] * adisp[inode].component(i);
+                    //BD::h()[ptI*BD::N()+inode] * adisp[inode].component(i);
+                    BD::h()[ptI*BD::N()+inode] * adisp[inode].component(BD::openfoamDir(i));
             }
         }
 
@@ -161,7 +163,7 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
         if(BD::enforce2D()) this->operator[](ptI).component(BD::bladeDirection()) = 0.0;
 
-    }
+    } //loop over all (surface) nodes on patch
 
     fixedValuePointPatchField<vector>::updateCoeffs();
 }

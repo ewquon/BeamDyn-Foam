@@ -456,6 +456,7 @@ namespace BD
                 }
                 else // write subsequent displacements to file
                 {
+                    // note: these are in the beamdyn frame
                     dispFile << " " << lin_disp[0] 
                              << " " << lin_disp[1] 
                              << " " << lin_disp[2];
@@ -711,6 +712,7 @@ namespace BD
                 //beamDynSetDistributedLoadAtNode(&inode, Ftot, Mtot);
                 beamDynSetDistributedLoad(&ig, Ftot, Mtot);
 
+                // Output loads are in the beamdyn frame
                 loadFile << " " << Ftot[0] 
                          << " " << Ftot[1] 
                          << " " << Ftot[2];
