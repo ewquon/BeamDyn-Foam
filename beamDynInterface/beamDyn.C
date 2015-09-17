@@ -483,11 +483,20 @@ namespace BD
 
     void calculateShapeFunctions( const pointField& pf )
     {
-        int nSurfNodes = pf.size(); // number of local points on interface patch
-        h_ptr = new double[nSurfNodes*nnodes];
-        //double &h = *h_ptr;
+        scalarList &r = *r_ptr;
+        if( bladeR0 < 0.0 ) bladeR0 = r[0];
+        if( bladeR  < 0.0 ) bladeR  = r[nnodes-1];
+        Info<< "r: " << r << endl;
+        //Pout<< "Blade span : " << bladeR0 << " " << bladeR << endl;
 
+        int nSurfNodes = pf.size(); // number of local points on interface patch
+        if( nSurfNodes==0 ) return;
+
+        h_ptr = new double[nSurfNodes*nnodes];
+
+        //
         // read/write shape function information
+        //
         std::string fname("shape.dat");
         if( Pstream::parRun() ) 
         {
@@ -503,97 +512,116 @@ namespace BD
 
             // read saved shape function
             std::ifstream hFile(fname, std::ios::in | std::ios::binary);
-            //hFile.read((char *) &h_ptr, sizeof(h_ptr)); // C-style
-            hFile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
+            if( !hFile.is_open() )
+            {
+                //hFile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
+                hFile.read( reinterpret_cast<char*>(h_ptr), 
+                            std::streamsize(nSurfNodes*sizeof(double)) );
+                hFile.close();
+
+                return;
+            }
+        }
+
+        //
+        // calculate shape functions
+        //
+        Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;
+
+        // DEBUG
+        scalar hmin( 9e9);
+        scalar hmax(-9e9);
+        scalar smin( 9e9);
+        scalar smax(-9e9);
+
+        double s;
+        double L_2 = (bladeR-bladeR0)/2.0;
+        double hi[nnodes];
+
+        double num, den;
+        double GLL[nnodes];
+        Info<< "GLL pts : "; // DEBUG
+        for( int i=0; i<nnodes; ++i )
+        {
+            GLL[i] = 2.0*(r[i]-r[0])/(r[nnodes-1]-r[0]) - 1.0;
+            Info<< " " << GLL[i];
+        }
+        Info<< endl;
+
+        forAll( pf, ptI )
+        {
+            //s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
+            s = ( pf[ptI].component(IECtoOF[bladeDir]) - bladeR0 ) / L_2 - 1.0;
+            smin = min(smin,s);
+            smax = max(smax,s);
+            //beamDynGetShapeFunctions( &s, hi ); // this only works on the master node...
+            //vvvvvvvvvv Code snippet from BeamDyn diffmtc subroutine vvvvvvvvvv
+            for( int j=0; j<nnodes; ++j )
+            {
+                hi[j] = 0.0;
+                num = 1.0;
+                den = 1.0;
+                if( fabs(s-GLL[j]) <= eps )
+                {
+                    hi[j] = 1.0;
+                }
+                else
+                {
+                    for( int i=0; i<nnodes; ++i )
+                    {
+                        if( i != j )
+                        {
+                            den *= (GLL[j] - GLL[i]);
+                            num *= (s - GLL[i]);
+                        }
+                    }
+                    hi[j] = num/den;
+                }
+            }
+            //^^^^^^^^^^^^^^^^^^^ End of code snippet ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+            scalar hsum(0);
+            for( int inode=0; inode < nnodes; ++inode )
+            {
+                h_ptr[ptI*nnodes + inode] = hi[inode];
+                hsum += hi[inode];
+            }
+            hmin = min(hmin,hsum);
+            hmax = max(hmax,hsum);
+
+        }// loop over surface nodes
+        Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
+            << " for s : [ " << smin << ", " << smax << " ]"
+            << endl;
+
+        // write shape functions
+        std::ofstream hFile(fname, std::ios::out | std::ios::binary);
+        if( !hFile.is_open() ) Pout<< "WARNING error writing " << fname << endl;
+        //hFile.write( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
+        hFile.write( reinterpret_cast<const char*>(h_ptr), 
+                     std::streamsize(nSurfNodes*sizeof(double)) );
+        hFile.close();
+    }
+
+    void calculateSurfaceOffsets( const pointField& pf )
+    {
+        int nSurfNodes = pf.size(); // number of local points on interface patch
+
+        if( restarted ) 
+        {
+            Info<< "Skipping surface offset calculation for restarted simulation" << endl;
+
+            // read saved shape function
+//            std::ifstream hFile(fname, std::ios::in | std::ios::binary);
+//            hFile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
 
             return;
         }
 
-        std::ofstream hFile(fname, std::ios::out | std::ios::binary);
-
-        scalarList &r = *r_ptr;
-        if( bladeR0 < 0.0 ) bladeR0 = r[0];
-        if( bladeR  < 0.0 ) bladeR  = r[nnodes-1];
-        Info<< "r: " << r << endl;
-        //Pout<< "Blade span : " << bladeR0 << " " << bladeR << endl;
-
         if( nSurfNodes > 0 )
         {
             Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;
-
-            // DEBUG
-            scalar hmin( 9e9);
-            scalar hmax(-9e9);
-            scalar smin( 9e9);
-            scalar smax(-9e9);
-
-            double s;
-            double L_2 = (bladeR-bladeR0)/2.0;
-            double hi[nnodes];
-
-            double num, den;
-            double GLL[nnodes];
-            Info<< "GLL pts : "; // DEBUG
-            for( int i=0; i<nnodes; ++i )
-            {
-                GLL[i] = 2.0*(r[i]-r[0])/(r[nnodes-1]-r[0]) - 1.0;
-                Info<< " " << GLL[i];
-            }
-            Info<< endl;
-
-            forAll( pf, ptI )
-            {
-                //s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
-                s = ( pf[ptI].component(IECtoOF[bladeDir]) - bladeR0 ) / L_2 - 1.0;
-                smin = min(smin,s);
-                smax = max(smax,s);
-                //beamDynGetShapeFunctions( &s, hi ); // this only works on the master node...
-                //vvvvvvvvvv Code snippet from BeamDyn diffmtc subroutine vvvvvvvvvv
-                for( int j=0; j<nnodes; ++j )
-                {
-                    hi[j] = 0.0;
-                    num = 1.0;
-                    den = 1.0;
-                    if( fabs(s-GLL[j]) <= eps )
-                    {
-                        hi[j] = 1.0;
-                    }
-                    else
-                    {
-                        for( int i=0; i<nnodes; ++i )
-                        {
-                            if( i != j )
-                            {
-                                den *= (GLL[j] - GLL[i]);
-                                num *= (s - GLL[i]);
-                            }
-                        }
-                        hi[j] = num/den;
-                    }
-                }
-                //^^^^^^^^^^^^^^^^^^^ End of code snippet ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-                scalar hsum(0);
-                for( int inode=0; inode < nnodes; ++inode )
-                {
-                    h_ptr[ptI*nnodes + inode] = hi[inode];
-                    hsum += hi[inode];
-
-                    hFile << hi[inode];
-                }
-                hmin = min(hmin,hsum);
-                hmax = max(hmax,hsum);
-
-            }// loop over surface nodes
-            Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
-                << " for s : [ " << smin << ", " << smax << " ]"
-                << endl;
-
-        }//if nSurfNodes > 0
-
-        //hFile.write((char *) &h_ptr, sizeof(h_ptr)); // C-style
-        hFile.write( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
-
+        }
     }
 
     //*********************************************************************************************
