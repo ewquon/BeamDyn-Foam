@@ -37,8 +37,8 @@ namespace BD
     word    patchName;
     label   patchID;
 
-    labelList  OFtoBD(3); // simple coordinate mappings
-    labelList  BDtoOF(3);
+    labelList  OFtoIEC(3); // simple coordinate mappings
+    labelList  IECtoOF(3);
 
     label   bladeDir;
     scalar  bladeR0;
@@ -69,8 +69,8 @@ namespace BD
     double  currentTime = -1;
     double  currentDeltaT = -1;
 
-    vectorList  *pos0_ptr,*rot0_ptr;    // starting position and orientation of beam nodes (BeamDyn coords)
-    vectorList  *pos_ptr, *rot_ptr;     // current position and orientation of beam nodes (BeamDyn coords)
+    vectorList  *pos0_ptr,*crv0_ptr;    // starting position and orientation of beam nodes (BeamDyn coords)
+    vectorList  *pos_ptr, *crv_ptr;     // current position and orientation of beam nodes (BeamDyn coords)
     vectorList  *disp_ptr;              // linear displacement at beam nodes (BeamDyn coords)
     vectorList  *adisp_ptr;             // angular displacement at beam nodes (BeamDyn coords)
     scalarList  *r_ptr;                 // spanwise coordinates of beam nodes
@@ -89,7 +89,9 @@ namespace BD
     label N() { return nnodes; };                 // number of beamdyn nodes
     Switch enforce2D() { return twoD; };          // force 2D displacements
     label bladeDirection() { return bladeDir; };
-    label openfoamDir(label dir) { return BDtoOF[dir]; };
+    label openfoamDir(label dir) { return IECtoOF[dir]; };
+
+    inline double crvToRad(double crv) { return 4.0 * Foam::atan( crv/4.0 ); };
 
 }
 

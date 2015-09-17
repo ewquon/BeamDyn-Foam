@@ -34,11 +34,10 @@ extern "C"
     // access functions
     //
 
-    void beamDynGetNnodes( int *nnodes );
+    void beamDynGetNNodes( int *nnodes );
+    void beamDynGetNode0InitialPosition( int *ispan, double *pos0, double *crv0 );      // get initial position/rotation at node (0-indexed)
+    void beamDynGetNode0Position( int *ispan, double *pos, double *crv );               // get position/rotation at node (0-indexed)
     void beamDynGetNode0Displacement( int *ispan, double *lin_disp, double *ang_disp ); // get linear/angular DISPLACEMENT at node (0-indexed)
-    void beamDynGetNode0Position( int *ispan, double *pos, double *rot );               // get position/rotation at node (0-indexed)
-    void beamDynGetInitialNode0Position( int *ispan, double *pos0, double *rot0 );      // get initial position/rotation at node (0-indexed)
-    void beamDynGetNode0RotationMatrix( int *ispan, double *R );                        // get rotation matrix[9], stored row-wise
 
     void beamDynGetShapeFunctions( double *s, double *hx );
 
@@ -48,6 +47,9 @@ extern "C"
     //void beamDynGetNgp( int *ngp );
     //void beamDynGetGLLPts( double *gllp, double *gllw );
     //void beamDynGetGaussPts( double *gp, double *gw );
+    //void beamDynGetNode0RotationMatrix( int *ispan, double *R );                        // get rotation matrix[9], stored row-wise
+
+    void beamDynGetRotationMatrix( double *adisp, double *Rmat );
 
 }
 

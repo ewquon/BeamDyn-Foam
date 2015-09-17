@@ -26,7 +26,7 @@ namespace BD
             Info<<   "================================" << endl;
             //Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n" << endl;
             beamDynStart( &t0, &dt );
-            beamDynGetNnodes( &nnodes ); // total number of nodes in beam model
+            beamDynGetNNodes( &nnodes ); // total number of nodes in beam model
             //Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
             Info<< "...done\n" << endl;
         }
@@ -35,9 +35,9 @@ namespace BD
         Pstream::scatter(nnodes);
         r_ptr    = new scalarList(nnodes, 0.0);
         pos0_ptr = new vectorList(nnodes, vector::zero);
-        rot0_ptr = new vectorList(nnodes, vector::zero);
+        crv0_ptr = new vectorList(nnodes, vector::zero);
         pos_ptr  = new vectorList(nnodes, vector::zero);
-        rot_ptr  = new vectorList(nnodes, vector::zero);
+        crv_ptr  = new vectorList(nnodes, vector::zero);
         disp_ptr = new vectorList(nnodes, vector::zero);
         adisp_ptr= new vectorList(nnodes, vector::zero);
 
@@ -74,12 +74,15 @@ namespace BD
                     Info<< "Problem opening restart file " << rstFile << endl;
                 }
 
-                // these outputs are in BeamDyn coordinates
+                //***these outputs are in IEC coordinates***
+                // angles are in degrees
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
                 dispFile.open("disp.out", std::ios::in | std::ios::out | std::ios::app);
             }
             else
             {
+                //***these outputs are in IEC coordinates***
+                // angles are in degrees
                 loadFile.open("load.out", std::ios::out);
                 dispFile.open("disp.out", std::ios::out);
             }
@@ -93,22 +96,22 @@ namespace BD
             dispFile.precision(8);
 
             // get initial configuration (IN BEAMDYN COORDINATES)
-            double posi[3], roti[3];
+            double posi[3], crvi[3];
             Info<< "Initial linear/angular position:" << endl;
             for( int inode=0; inode < nnodes; ++inode )
             {
-                beamDynGetInitialNode0Position( &inode, posi, roti );
+                beamDynGetNode0InitialPosition( &inode, posi, crvi );
                 for(int i=0; i < 3; ++i) {
                     (*pos0_ptr)[inode][i] = posi[i];
-                    (*rot0_ptr)[inode][i] = roti[i];
+                    (*crv0_ptr)[inode][i] = crvi[i];
                 }
                 Info<< " " << posi[0] 
                     << " " << posi[1] 
                     << " " << posi[2]
                     << "  "
-                    << " " << roti[0]*radToDeg
-                    << " " << roti[1]*radToDeg
-                    << " " << roti[2]*radToDeg
+                    << " " << crvToRad(crvi[0])*radToDeg
+                    << " " << crvToRad(crvi[1])*radToDeg
+                    << " " << crvToRad(crvi[2])*radToDeg
                     << endl;
             }
 
@@ -121,7 +124,7 @@ namespace BD
 //        for( int inode=0; inode < nnodes; ++inode )
 //        {
 //            (*pos0_ptr)[inode] = (*pos_ptr)[inode];
-//            (*rot0_ptr)[inode] = (*rot_ptr)[inode];
+//            (*crv0_ptr)[inode] = (*crv_ptr)[inode];
 //        }
 
         Info<< "BeamDyn initialization complete.\n\n";
@@ -174,11 +177,11 @@ namespace BD
         vector coordMap = couplingProperties.lookupOrDefault<vector>("coordinateMapping",vector(0,1,2));
         for( int i=0; i<3; ++i )
         {
-            OFtoBD[i] = label(coordMap[i]);
-            BDtoOF[OFtoBD[i]] = i;
+            OFtoIEC[i] = label(coordMap[i]);
+            IECtoOF[OFtoIEC[i]] = i;
         }
-        Info<< "  Coordinate mapping from OpenFOAM to BeamDyn : " << OFtoBD << endl;
-        Info<< "  Coordinate mapping from BeamDyn to OpenFoam : " << BDtoOF << endl;
+        Info<< "  Coordinate mapping from OpenFOAM to IEC : " << OFtoIEC << endl;
+        Info<< "  Coordinate mapping from IEC to OpenFoam : " << IECtoOF << endl;
 
         twoD = couplingProperties.lookupOrDefault<Switch>("twoD",0);
         Info<< "  Constrain rotation to about the blade axis (2D) : " << twoD << endl;
@@ -238,9 +241,9 @@ namespace BD
         //Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n" << endl;
 
         delete pos0_ptr;
-        delete rot0_ptr;
+        delete crv0_ptr;
         delete pos_ptr;
-        delete rot_ptr;
+        delete crv_ptr;
         delete disp_ptr;
         delete adisp_ptr;
         delete r_ptr;
@@ -272,7 +275,7 @@ namespace BD
 
     //*********************************************************************************************
 
-//    void updatePrescribedDeflection( double t )
+//    void updatePrescribedDeflection( double t )/*{{{*/
 //    {
 //        if(Pstream::master()) 
 //        {
@@ -357,7 +360,7 @@ namespace BD
 //        }
 //
 //        updateNodePositions();
-//    }
+//    }/*}}}*/
 
     //*********************************************************************************************
 
@@ -389,7 +392,7 @@ namespace BD
         vectorList &pos0 = *pos0_ptr;
         //vectorList &rot0 = *rot0_ptr; // not used
         vectorList &pos  = *pos_ptr;
-        vectorList &rot  = *rot_ptr;
+        vectorList &crv  = *crv_ptr;
         vectorList &disp = *disp_ptr;
         vectorList &adisp= *adisp_ptr;
 
@@ -401,18 +404,13 @@ namespace BD
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             //   TODO: handle multiple elements
-//            double posi[3], roti[3];
             double lin_disp[3], ang_disp[3];
             //double ang;
 //            double R[9]; //rotation matrix from BeamDyn
             for( int inode=0; inode<nnodes; ++inode ) 
             {
 
-                // get node linear/angular displacement [m, rad]
-                //   returns rotation_angle - initial_rotation_angle
-                //   initial_rotation_angle should be stored in (*rot0_ptr) during start()
-                //   => this returns the wrong angular displacement at the zeroth step
-                //      but is this ever used???
+                // get node linear/angular displacement [m, crv]
                 beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
 // ROTATION SHOULD BE APPLIED FOR THE POINTS ON THE INTERFACE PATCH!!!
@@ -441,7 +439,7 @@ namespace BD
                 }
 
                 // used for sectional loads calculation
-                // note: pos0 and disp are in BeamDyn coords
+                // note: pos0 and disp are in IEC coords
                 r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
@@ -451,9 +449,9 @@ namespace BD
                     Info<< " " << lin_disp[0] 
                         << " " << lin_disp[1] 
                         << " " << lin_disp[2]
-                        << " " << ang_disp[0]*radToDeg
-                        << " " << ang_disp[1]*radToDeg
-                        << " " << ang_disp[2]*radToDeg
+                        << " " << crvToRad(ang_disp[0])*radToDeg
+                        << " " << crvToRad(ang_disp[1])*radToDeg
+                        << " " << crvToRad(ang_disp[2])*radToDeg
                         << endl;
                 }
                 else // write subsequent displacements to file
@@ -462,9 +460,9 @@ namespace BD
                     dispFile << " " << lin_disp[0] 
                              << " " << lin_disp[1] 
                              << " " << lin_disp[2];
-                    dispFile << " " << ang_disp[0]*radToDeg 
-                             << " " << ang_disp[1]*radToDeg 
-                             << " " << ang_disp[2]*radToDeg;
+                    dispFile << " " << crvToRad(ang_disp[0])*radToDeg 
+                             << " " << crvToRad(ang_disp[1])*radToDeg 
+                             << " " << crvToRad(ang_disp[2])*radToDeg;
                 }
 
             }// loop over beam nodes
@@ -476,7 +474,7 @@ namespace BD
 
         Pstream::scatter(r);
         Pstream::scatter(pos); // verified that this works
-        Pstream::scatter(rot);
+        Pstream::scatter(crv);
         Pstream::scatter(disp);
         Pstream::scatter(adisp);
     }
@@ -546,7 +544,7 @@ namespace BD
             forAll( pf, ptI )
             {
                 //s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
-                s = ( pf[ptI].component(BDtoOF[bladeDir]) - bladeR0 ) / L_2 - 1.0;
+                s = ( pf[ptI].component(IECtoOF[bladeDir]) - bladeR0 ) / L_2 - 1.0;
                 smin = min(smin,s);
                 smax = max(smax,s);
                 //beamDynGetShapeFunctions( &s, hi ); // this only works on the master node...
@@ -587,9 +585,9 @@ namespace BD
                 hmax = max(hmax,hsum);
 
             }// loop over surface nodes
-//            Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
-//                << " for s : [ " << smin << ", " << smax << " ]"
-//                << endl;
+            Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
+                << " for s : [ " << smin << ", " << smax << " ]"
+                << endl;
 
         }//if nSurfNodes > 0
 
@@ -637,6 +635,8 @@ namespace BD
         first = false;
     }
 
+
+    // actual interface routine
     void updateSectionLoads( const dynamicFvMesh& mesh, 
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence )
@@ -704,7 +704,7 @@ namespace BD
             {
                 vector rc( bladePatch.faceCentres()[faceI] );
                 //if( rc[bladeDir] >= r0 && rc[bladeDir] < r1 )
-                if( rc[BDtoOF[bladeDir]] >= r0 && rc[BDtoOF[bladeDir]] < r1 )
+                if( rc[IECtoOF[bladeDir]] >= r0 && rc[IECtoOF[bladeDir]] < r1 )
                 {
                     vector Sf( bladePatchNormals[faceI] ); // surface normal
                     vector dm( rc - origin );
@@ -727,7 +727,7 @@ namespace BD
             Pstream::gather(Mp, sumOp<vector>());
             Pstream::gather(Mv, sumOp<vector>());
 
-            double Ftot[3], Mtot[3]; // these should be in BD coordinates
+            double Ftot[3], Mtot[3]; // these should be in IEC coordinates
             if(Pstream::master())
             {
                 for (int i=0; i<3; ++i) 
@@ -736,8 +736,8 @@ namespace BD
                     //Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
                     //Ftot[i] = Fp[i] + Fv[i];
                     //Mtot[i] = Mp[i] + Mv[i];
-                    Ftot[OFtoBD[i]] = Fp[i] + Fv[i];
-                    Mtot[OFtoBD[i]] = Mp[i] + Mv[i];
+                    Ftot[OFtoIEC[i]] = Fp[i] + Fv[i];
+                    Mtot[OFtoIEC[i]] = Mp[i] + Mv[i];
                 }
 
                 // Update F_foam and M_foam in BeamDyn library
@@ -772,6 +772,38 @@ namespace BD
 
         first = false;
 
+    }
+
+    // disp is the interpolated displacement vector that will be rotated
+    // adisp is the interpolated angular displacement
+    void rotateDisplacementVector(double* disp, double* adisp)
+    {
+        double disp0[3];
+        for( int i=0; i<3; ++i) { disp0[i] = disp[i]; }
+
+        double Rmat[9];
+        beamDynGetRotationMatrix( adisp, Rmat ); // fortran subroutine will convert from angular disp to CRV params
+
+        for( int i=0; i<3; ++i )
+        {
+            disp[i] = 0;
+            for( int j=0; j<3; ++j )
+            {
+                disp[i] += Rmat[3*i+j]*disp0[j];
+            }
+        }
+
+        Info<< "adisp=" 
+            << adisp[0] << ","
+            << adisp[1] << ","
+            << adisp[2] << " : "
+            << " disp : " 
+            << disp0[0] << ","
+            << disp0[1] << ","
+            << disp0[2] << " --> "
+            << disp[0] << ","
+            << disp[1] << ","
+            << disp[2] << endl;
     }
 
 } // end of BD namespace

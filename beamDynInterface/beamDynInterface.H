@@ -46,9 +46,12 @@ namespace BD
                              const incompressible::turbulenceModel& turbulence );
 
     void update( double t, double dt );
-    void updatePrescribedDeflection( double t );
+    //void updatePrescribedDeflection( double t );
 
     void updateNodePositions();
+
+    void rotateDisplacementVector( double* disp,
+                                   double* adisp );
 
     void write( std::string timeName, bool writeNow );
 
