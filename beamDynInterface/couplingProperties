@@ -19,7 +19,7 @@ interfacePatch      blade;      // name of boundary patch
 
 bladeR              0.5;        // blade tip position (default: -1, determine from BeamDyn nodes)
 bladeR0             0;          // blade root position (default: -1, determine from BeamDyn nodes)
-bladeDir            2;          // blade direction in IEC coordinates, 0/1/2 --> x/y/z (normal|LE->TE|radial)
+bladeDir            1;          // blade direction in OpenFOAM coordinate system
 origin              (0 0 0);    // for calculating moments during sectional load update
 
 coordinateMapping   (1 2 0);    // swap axes to go from OpenFOAM to IEC coordinates

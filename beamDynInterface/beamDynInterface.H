@@ -28,6 +28,8 @@ namespace BD
     Switch enforce2D();
     label bladeDirection();
     label openfoamDir(label dir);
+    vectorList& p();
+    vectorList& x1();
 
     // member functions
 
@@ -38,6 +40,7 @@ namespace BD
 
     void start( double t0, double dt );
     void calculateShapeFunctions( const pointField& pf );
+    void calculateInitialDisplacementVectors( const pointField& pf );
 
     void updateSectionLoads( const double* F,  // set constant distributed load, for testing
                              const double* M );
@@ -50,8 +53,8 @@ namespace BD
 
     void updateNodePositions();
 
-    void rotateDisplacementVector( double* disp,
-                                   double* adisp );
+    void rotateVector( vector v,
+                       const vector crv );
 
     void write( std::string timeName, bool writeNow );
 

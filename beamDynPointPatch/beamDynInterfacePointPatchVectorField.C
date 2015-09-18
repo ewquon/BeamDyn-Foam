@@ -108,75 +108,86 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
         return;
     }
 
-    vector u(vector::zero); // interpolated linear displacement
-    vector a(vector::zero); // interpolated angular displacement
+//    double minTwist=9e9, maxTwist=-9e9;
 
-    double ang, minTwist=9e9, maxTwist=-9e9;
-    vector v(vector::zero); // additional displacement vector due to rotation
+    vector u(vector::zero); // interpolated linear displacement
+    vector crv(vector::zero); // interpolated angular displacement
 
     //- patch coordinates, if needed
     //const labelList& meshPoints = patch().meshPoints(); // returns polyPatch_.meshPoints(), i.e. node IDs
     const pointField& localPoints = patch().localPoints(); // returns polyPatch_.localPoints(), i.e. DISPLACED node coords
-    Info<< "- TEST: node coords, pt disp vec : " << localPoints[0] << " " << this->operator[](0) << endl;
+    //Info<< "- TEST: node coords, pt disp vec : " << localPoints[0] << " " << this->operator[](0) << endl;
 
     //- current time, if needed
     //const polyMesh& mesh = this->dimensionedInternalField().mesh()();
     //const Time& t = mesh.time();
 
-    vectorList& disp  = BD::linDisp();  // linear displacement in beamdyn coords
-    vectorList& adisp = BD::angDisp(); // angular displacement in beamdyn coords
+    vectorList& uList = BD::linDisp();   // linear displacement at BD nodes in IEC coords
+    vectorList& crvList = BD::angDisp(); // angular displacement at BD nodes in IEC coords
 
-    //- output debug info (same info is output to disp.out, with ang disp output in degrees)
-    //Info<< "- with linear displacement  : " << disp << endl;
-    //Info<< "- with angular displacement : " << adisp << endl;
+    vectorList& pList = BD::p();        // surface offset vector
+    vectorList& x1List = BD::x1();      // position vector along beam axis
 
     //
     // --loop over all surface nodes
     //
     forAll(*this, ptI)
     {
-        // get displacement from pre-calculated shape function
-        u = vector::zero;
-        a = vector::zero;
+        // interpolate displacement from pre-calculated shape function
+        u   = vector::zero; // in OpenFoam coords
+        crv = vector::zero; // in OpenFoam coords
         for( int inode=0; inode<BD::N(); ++inode )
         {
             for( int i=0; i<3; ++i )
             {
-                u.component(i) += 
-                    //BD::h()[ptI*BD::N()+inode] * disp[inode].component(i);
-                    BD::h()[ptI*BD::N()+inode] * disp[inode].component(BD::openfoamDir(i));
-                a.component(i) += 
-                    //BD::h()[ptI*BD::N()+inode] * adisp[inode].component(i);
-                    BD::h()[ptI*BD::N()+inode] * adisp[inode].component(BD::openfoamDir(i));
+                u.component(i)   += BD::h()[ptI*BD::N()+inode] *   uList[inode].component(BD::openfoamDir(i));
+                crv.component(i) += BD::h()[ptI*BD::N()+inode] * crvList[inode].component(BD::openfoamDir(i));
             }
         }
+
+        // calculate vector components
+        vector x1 = x1List[ptI] + u;    // in OpenFoam coords
+        vector p = pList[ptI];          // in OpenFoam coords
+        BD::rotateVector( p, crv );     // rotates p, in OpenFoam coords
 
 /////////////////////////////////////////////////////////////////////
 // TODO: general rotations, retrieve rotation matrix -- need VABS...
 // for now, simple rotation about x0-axis (in BD frame) with cross sections remaining planar
 /////////////////////////////////////////////////////////////////////
-        ang = a.component(BD::bladeDirection());
-        minTwist = min(minTwist,ang);
-        maxTwist = max(maxTwist,ang);
-        v[BD::openfoamDir(0)] = 0;
-        v[BD::openfoamDir(1)] = localPoints[ptI].component(BD::openfoamDir(1)) * Foam::cos(ang) 
-                              - localPoints[ptI].component(BD::openfoamDir(2)) * Foam::sin(ang)
-                              - localPoints[ptI].component(BD::openfoamDir(1));
-        v[BD::openfoamDir(2)] = localPoints[ptI].component(BD::openfoamDir(1)) * Foam::sin(ang) 
-                              + localPoints[ptI].component(BD::openfoamDir(2)) * Foam::cos(ang)
-                              - localPoints[ptI].component(BD::openfoamDir(2));
+//        ang = a.component(BD::bladeDirection());
+//        minTwist = min(minTwist,ang);
+//        maxTwist = max(maxTwist,ang);
+//        v[BD::openfoamDir(0)] = 0;
+//        v[BD::openfoamDir(1)] = localPoints[ptI].component(BD::openfoamDir(1)) * Foam::cos(ang) 
+//                              - localPoints[ptI].component(BD::openfoamDir(2)) * Foam::sin(ang)
+//                              - localPoints[ptI].component(BD::openfoamDir(1));
+//        v[BD::openfoamDir(2)] = localPoints[ptI].component(BD::openfoamDir(1)) * Foam::sin(ang) 
+//                              + localPoints[ptI].component(BD::openfoamDir(2)) * Foam::cos(ang)
+//                              - localPoints[ptI].component(BD::openfoamDir(2));
+//
 
         // Apply displacement
-        //this->operator[](ptI) = u;
-        this->operator[](ptI) = u + v;
+//        //this->operator[](ptI) = u;
+//        this->operator[](ptI) = u + v;
 
+        this->operator[](ptI) = x1 + p - localPoints[ptI];
+//        Info<< " x: " << localPoints[ptI] << endl;
+//        Info<< " u: " << u << endl;
+//        Info<< "x1: " << x1List[ptI] << endl;
+//        Info<< " p: " << pList[ptI] << endl << endl;
+
+        // for testing
         if(BD::enforce2D()) this->operator[](ptI).component(BD::bladeDirection()) = 0.0;
+
+        // update displacement vector lists
+        pList[ptI] = p;
+        x1List[ptI] = x1;
 
     } //loop over all (surface) nodes on patch
 
-    Info<< "- min/max twist : " 
-        << minTwist*180.0/Foam::constant::mathematical::pi << " " 
-        << maxTwist*180.0/Foam::constant::mathematical::pi << " deg" << endl;
+//    Info<< "- min/max twist : " 
+//        << minTwist*180.0/Foam::constant::mathematical::pi << " " 
+//        << maxTwist*180.0/Foam::constant::mathematical::pi << " deg" << endl;
 
     fixedValuePointPatchField<vector>::updateCoeffs();
 }

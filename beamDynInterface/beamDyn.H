@@ -16,6 +16,8 @@
 //#include "dynamicFvMesh.H"
 
 #include <fstream>
+#include "IFstream.H"
+#include "OFstream.H"
 
 #include "beamDynInterface.H" // same as what's included by the other codes!
 
@@ -69,14 +71,28 @@ namespace BD
     double  currentTime = -1;
     double  currentDeltaT = -1;
 
-    vectorList  *pos0_ptr,*crv0_ptr;    // starting position and orientation of beam nodes (BeamDyn coords)
-    vectorList  *pos_ptr, *crv_ptr;     // current position and orientation of beam nodes (BeamDyn coords)
-    vectorList  *disp_ptr;              // linear displacement at beam nodes (BeamDyn coords)
-    vectorList  *adisp_ptr;             // angular displacement at beam nodes (BeamDyn coords)
-    scalarList  *r_ptr;                 // spanwise coordinates of beam nodes
+    // calculated/used once at t=0
     double      *h_ptr;                 // shape functions [ # CFD nodes * # BD nodes ]
+    vectorList  *p_ptr;                 // surface offset vectors
 
+    scalarList  *r_ptr;                 // spanwise coordinates of beam nodes used to calculate shape functions
+                                        // - calculated in updateNodePositions() at the end of BD::start()
+
+    vectorList  *pos0_ptr,*crv0_ptr;    // starting position and orientation of beam nodes (IEC coords)
+                                        // - pos0_ptr used to evaluate r to calculate shape functions
+                                        // - crv0_ptr is NOT USED
+
+    // calculated in updateNodePositions() after calling beamDynStep()
+    //vectorList  *pos_ptr, *crv_ptr;     // current position and orientation of beam nodes (IEC coords) -- NOT USED
+    vectorList  *disp_ptr;              // linear displacement at beam nodes (IEC coords)
+    vectorList  *adisp_ptr;             // angular displacement at beam nodes (IEC coords)
+    
+    // calculated at all t
+    vectorList  *x1_ptr;                // position vector along the beam (x1) axis
+
+    //
     // access functions
+    //
 
     //-used by solver
     label interfacePatchID() { return patchID; };
@@ -90,9 +106,14 @@ namespace BD
     Switch enforce2D() { return twoD; };          // force 2D displacements
     label bladeDirection() { return bladeDir; };
     label openfoamDir(label dir) { return IECtoOF[dir]; };
+    vectorList& p() { return *p_ptr; };           // surface node offset
+    vectorList& x1() { return *x1_ptr; };         // beam axis position
 
+    //
+    // utility functions
+    //
     inline double crvToRad(double crv) { return 4.0 * Foam::atan( crv/4.0 ); };
-
+    std::string createFname( std::string fname );
 }
 
 // only need this is we're not compiling this source as part of a library(?)

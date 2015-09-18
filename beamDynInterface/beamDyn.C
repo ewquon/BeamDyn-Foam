@@ -36,8 +36,6 @@ namespace BD
         r_ptr    = new scalarList(nnodes, 0.0);
         pos0_ptr = new vectorList(nnodes, vector::zero);
         crv0_ptr = new vectorList(nnodes, vector::zero);
-        pos_ptr  = new vectorList(nnodes, vector::zero);
-        crv_ptr  = new vectorList(nnodes, vector::zero);
         disp_ptr = new vectorList(nnodes, vector::zero);
         adisp_ptr= new vectorList(nnodes, vector::zero);
 
@@ -120,13 +118,6 @@ namespace BD
         updateNodePositions(); // this should write out either the initial configuration (0's)
                                // or the restart configuration
 
-//        // save initial configuration, used by updateNodePositions() in subsequent iterations
-//        for( int inode=0; inode < nnodes; ++inode )
-//        {
-//            (*pos0_ptr)[inode] = (*pos_ptr)[inode];
-//            (*crv0_ptr)[inode] = (*crv_ptr)[inode];
-//        }
-
         Info<< "BeamDyn initialization complete.\n\n";
 
     }
@@ -172,7 +163,7 @@ namespace BD
 
         //label bladeDir( couplingProperties.lookupOrDefault<label>("bladeDir",0) );
         bladeDir = couplingProperties.lookupOrDefault<label>("bladeDir",0);
-        Info<< "  Blade axis (beamdyn coords): " << bladeDir << endl;
+        Info<< "  Blade axis (openfoam coords): " << bladeDir << endl;
 
         vector coordMap = couplingProperties.lookupOrDefault<vector>("coordinateMapping",vector(0,1,2));
         for( int i=0; i<3; ++i )
@@ -242,12 +233,11 @@ namespace BD
 
         delete pos0_ptr;
         delete crv0_ptr;
-        delete pos_ptr;
-        delete crv_ptr;
         delete disp_ptr;
         delete adisp_ptr;
         delete r_ptr;
         delete [] h_ptr;
+        delete p_ptr;
 
         if (Pstream::master())
         {
@@ -368,9 +358,19 @@ namespace BD
     {
         if (!writeNow || !Pstream::master()) return;
 
-        //std::string fname("BeamDynState_" + timeName + ".dat");
+        // states are stored in beamdyn (fortran) structures
         std::string fname(timeName + "/BeamDynState.dat");
         beamDynWriteState( fname.c_str() );
+
+        // latest vectorList of surface node offsets and positions along the beam axis
+        fname = createFname("dispVectors.dat");
+        Foam::OFstream ofile(fname);
+        if( ofile )
+        {
+            ofile << (*p_ptr);
+            ofile << (*x1_ptr);
+        }
+        else Pout<< "WARNING error opening " << fname << endl;
     }
 
 
@@ -391,8 +391,8 @@ namespace BD
         scalarList &r    = *r_ptr;
         vectorList &pos0 = *pos0_ptr;
         //vectorList &rot0 = *rot0_ptr; // not used
-        vectorList &pos  = *pos_ptr;
-        vectorList &crv  = *crv_ptr;
+        //vectorList &pos  = *pos_ptr; // not used
+        //vectorList &crv  = *crv_ptr;
         vectorList &disp = *disp_ptr;
         vectorList &adisp= *adisp_ptr;
 
@@ -409,13 +409,12 @@ namespace BD
 //            double R[9]; //rotation matrix from BeamDyn
             for( int inode=0; inode<nnodes; ++inode ) 
             {
-
                 // get node linear/angular displacement [m, crv]
                 beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
 // ROTATION SHOULD BE APPLIED FOR THE POINTS ON THE INTERFACE PATCH!!!
 //                beamDynGetNode0RotationMatrix( &inode, R );
-// DEBUG
+// DEBUG/*{{{*/
 // these are identity before the first iteration and approximately the identity matrix afterwards
 //                Info << "DEBUG R matrix " << inode << " : \n";
 //                Info << " R=[" << R[0] << " " << R[1] << " " << R[2] << "; ...\n";
@@ -431,7 +430,8 @@ namespace BD
 //
 //                    //disp[inode].component(j) = lin_disp[j];
 //                }
-//                if(twoD) disp[inode].component(bladeDir) = 0.0;
+//                if(twoD) disp[inode].component(bladeDir) = 0.0;/*}}}*/
+
                 for( int i=0; i<3; ++i )
                 {
                     disp[inode].component(i) = lin_disp[i];
@@ -440,7 +440,7 @@ namespace BD
 
                 // used for sectional loads calculation
                 // note: pos0 and disp are in IEC coords
-                r[inode] = pos0[inode][bladeDir] + disp[inode].component(bladeDir);
+                r[inode] = pos0[inode][OFtoIEC[bladeDir]] + disp[inode].component(OFtoIEC[bladeDir]);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
                 {
@@ -472,15 +472,29 @@ namespace BD
 
         }// if Pstream::master
 
-        Pstream::scatter(r);
-        Pstream::scatter(pos); // verified that this works
-        Pstream::scatter(crv);
-        Pstream::scatter(disp);
-        Pstream::scatter(adisp);
-    }
+        // verified that broadcast of vectorlists work
+        //Pstream::scatter(pos);
+        //Pstream::scatter(crv);
+        Pstream::scatter(r); // needed for calculateShapeFunctions()
+        Pstream::scatter(disp); // needed for pointPatchField
+        Pstream::scatter(adisp); // needed for pointPatchField
+
+    } // end of updateNodePositions()
 
     //*********************************************************************************************
+    std::string createFname( const std::string fname )
+    {
+        if( Pstream::parRun() ) 
+        {
+            std::stringstream ss;
+            ss << "processor" << Pstream::myProcNo() << "/" << fname;
+            return ss.str();
+        }
+        else return fname;
+    }
 
+
+    // This should be called once prior to the main solver loop
     void calculateShapeFunctions( const pointField& pf )
     {
         scalarList &r = *r_ptr;
@@ -497,13 +511,7 @@ namespace BD
         //
         // read/write shape function information
         //
-        std::string fname("shape.dat");
-        if( Pstream::parRun() ) 
-        {
-            std::stringstream ss;
-            ss << "processor" << Pstream::myProcNo() << "/" << fname;
-            fname = ss.str();
-        }
+        std::string fname = createFname("shape.dat");
 
         if( restarted )
         {
@@ -511,22 +519,23 @@ namespace BD
             Info<< "Skipping shape function calculation for restarted simulation" << endl;
 
             // read saved shape function
-            std::ifstream hFile(fname, std::ios::in | std::ios::binary);
-            if( !hFile.is_open() )
+            std::ifstream ifile(fname, std::ios::in | std::ios::binary);
+            if( !ifile.is_open() )
             {
-                //hFile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
-                hFile.read( reinterpret_cast<char*>(h_ptr), 
+                //ifile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
+                ifile.read( reinterpret_cast<char*>(h_ptr), 
                             std::streamsize(nSurfNodes*sizeof(double)) );
-                hFile.close();
+                ifile.close();
 
                 return;
             }
+            Info<< "Problem opening " << fname << "... " << endl;
         }
 
         //
         // calculate shape functions
         //
-        Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;
+        Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;/*{{{*/
 
         // DEBUG
         scalar hmin( 9e9);
@@ -551,7 +560,7 @@ namespace BD
         forAll( pf, ptI )
         {
             //s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
-            s = ( pf[ptI].component(IECtoOF[bladeDir]) - bladeR0 ) / L_2 - 1.0;
+            s = ( pf[ptI].component(bladeDir) - bladeR0 ) / L_2 - 1.0;
             smin = min(smin,s);
             smax = max(smax,s);
             //beamDynGetShapeFunctions( &s, hi ); // this only works on the master node...
@@ -592,35 +601,51 @@ namespace BD
         }// loop over surface nodes
         Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
             << " for s : [ " << smin << ", " << smax << " ]"
-            << endl;
+            << endl;/*}}}*/
 
         // write shape functions
-        std::ofstream hFile(fname, std::ios::out | std::ios::binary);
-        if( !hFile.is_open() ) Pout<< "WARNING error writing " << fname << endl;
-        //hFile.write( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
-        hFile.write( reinterpret_cast<const char*>(h_ptr), 
+        std::ofstream ofile(fname, std::ios::out | std::ios::binary);
+        if( !ofile.is_open() ) Pout<< "WARNING error opening " << fname << endl;
+        //ofile.write( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
+        ofile.write( reinterpret_cast<const char*>(h_ptr), 
                      std::streamsize(nSurfNodes*sizeof(double)) );
-        hFile.close();
+        ofile.close();
     }
 
-    void calculateSurfaceOffsets( const pointField& pf )
+
+    // This should be called once prior to the main solver loop to initialize
+    // the surface offset (p_ptr) and beam position (x1_ptr) vector lists
+    void calculateInitialDisplacementVectors( const pointField& pf )
     {
         int nSurfNodes = pf.size(); // number of local points on interface patch
+        if( nSurfNodes==0 ) return;
 
+        p_ptr  = new vectorList(nSurfNodes, vector::zero);
+        x1_ptr = new vectorList(nSurfNodes, vector::zero);
+
+        // read if restart
         if( restarted ) 
         {
             Info<< "Skipping surface offset calculation for restarted simulation" << endl;
 
-            // read saved shape function
-//            std::ifstream hFile(fname, std::ios::in | std::ios::binary);
-//            hFile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
-
-            return;
+            std::string fname = createFname("dispVectors.dat");
+            Foam::IFstream ifile(fname);
+            if(ifile)
+            {
+                ifile >> (*p_ptr);
+                ifile >> (*x1_ptr);
+                return;
+            }
+            Info<< "Problem opening " << fname << "... " << endl;
         }
 
-        if( nSurfNodes > 0 )
+        // calculate vectors
+        Pout << "calculating offsets for " << nSurfNodes << " surface nodes" << endl;
+        forAll( pf, ptI )
         {
-            Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;
+            (*p_ptr)[ptI] = pf[ptI];
+            (*p_ptr)[ptI][bladeDir] = 0;
+            (*x1_ptr)[ptI][bladeDir] = pf[ptI].component(bladeDir);
         }
     }
 
@@ -731,8 +756,7 @@ namespace BD
             forAll( bladePatch, faceI )
             {
                 vector rc( bladePatch.faceCentres()[faceI] );
-                //if( rc[bladeDir] >= r0 && rc[bladeDir] < r1 )
-                if( rc[IECtoOF[bladeDir]] >= r0 && rc[IECtoOF[bladeDir]] < r1 )
+                if( rc[bladeDir] >= r0 && rc[bladeDir] < r1 )
                 {
                     vector Sf( bladePatchNormals[faceI] ); // surface normal
                     vector dm( rc - origin );
@@ -804,34 +828,54 @@ namespace BD
 
     // disp is the interpolated displacement vector that will be rotated
     // adisp is the interpolated angular displacement
-    void rotateDisplacementVector(double* disp, double* adisp)
-    {
-        double disp0[3];
-        for( int i=0; i<3; ++i) { disp0[i] = disp[i]; }
+//    void rotateDisplacementVector(double* disp, double* adisp)
+//    {
+//        double disp0[3];
+//        for( int i=0; i<3; ++i) { disp0[i] = disp[i]; }
+//
+//        double Rmat[9];
+//        beamDynGetRotationMatrix( adisp, Rmat ); // fortran subroutine will convert from angular disp to CRV params
+//
+//        for( int i=0; i<3; ++i )
+//        {
+//            disp[i] = 0;
+//            for( int j=0; j<3; ++j )
+//            {
+//                disp[i] += Rmat[3*i+j]*disp0[j];
+//            }
+//        }
+//
+//        Info<< "adisp=" 
+//            << adisp[0] << ","
+//            << adisp[1] << ","
+//            << adisp[2] << " : "
+//            << " disp : " 
+//            << disp0[0] << ","
+//            << disp0[1] << ","
+//            << disp0[2] << " --> "
+//            << disp[0] << ","
+//            << disp[1] << ","
+//            << disp[2] << endl;
+//    }
 
-        double Rmat[9];
-        beamDynGetRotationMatrix( adisp, Rmat ); // fortran subroutine will convert from angular disp to CRV params
+    // crv should be interpolated and in the OpenFOAM ref frame
+    void rotateVector(vector v, const vector crv)
+    {
+        vector v0(v);
+        double R[9], dblCrv[3];
+        for( int i=0; i<3; ++i ) { dblCrv[i] = crv[i]; }
+
+        // dblCrv is in IEC coords
+        beamDynGetRotationMatrix(R,dblCrv);
 
         for( int i=0; i<3; ++i )
         {
-            disp[i] = 0;
+            v[i] = 0;
             for( int j=0; j<3; ++j )
             {
-                disp[i] += Rmat[3*i+j]*disp0[j];
+                v[i] += R[3*i+j]*v0[j];
             }
         }
-
-        Info<< "adisp=" 
-            << adisp[0] << ","
-            << adisp[1] << ","
-            << adisp[2] << " : "
-            << " disp : " 
-            << disp0[0] << ","
-            << disp0[1] << ","
-            << disp0[2] << " --> "
-            << disp[0] << ","
-            << disp[1] << ","
-            << disp[2] << endl;
     }
 
 } // end of BD namespace
