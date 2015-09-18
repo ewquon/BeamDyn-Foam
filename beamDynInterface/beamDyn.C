@@ -72,14 +72,14 @@ namespace BD
                     Info<< "Problem opening restart file " << rstFile << endl;
                 }
 
-                //***these outputs are in IEC coordinates***
+                //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
                 dispFile.open("disp.out", std::ios::in | std::ios::out | std::ios::app);
             }
             else
             {
-                //***these outputs are in IEC coordinates***
+                //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::out);
                 dispFile.open("disp.out", std::ios::out);
@@ -457,12 +457,12 @@ namespace BD
                 else // write subsequent displacements to file
                 {
                     // note: these are in the beamdyn frame
-                    dispFile << " " << lin_disp[0] 
-                             << " " << lin_disp[1] 
-                             << " " << lin_disp[2];
-                    dispFile << " " << crvToRad(ang_disp[0])*radToDeg 
-                             << " " << crvToRad(ang_disp[1])*radToDeg 
-                             << " " << crvToRad(ang_disp[2])*radToDeg;
+                    dispFile << " " << lin_disp[IECtoOF[0]] 
+                             << " " << lin_disp[IECtoOF[1]] 
+                             << " " << lin_disp[IECtoOF[2]];
+                    dispFile << " " << crvToRad(ang_disp[IECtoOF[0]])*radToDeg 
+                             << " " << crvToRad(ang_disp[IECtoOF[1]])*radToDeg 
+                             << " " << crvToRad(ang_disp[IECtoOF[2]])*radToDeg;
                 }
 
             }// loop over beam nodes
@@ -737,6 +737,9 @@ namespace BD
         loadFile << currentTime + currentDeltaT;
 //        Info<< "Integrating sectional loads" << endl;
         if(first) Info<< "Initial info:" << endl;
+        //double Ftot[3], Mtot[3];
+        vector Ftot(vector::zero);
+        vector Mtot(vector::zero);
         for( int ig=0; ig<nnodes-1; ++ig ) 
         {
             vector Fp(vector::zero);
@@ -779,7 +782,8 @@ namespace BD
             Pstream::gather(Mp, sumOp<vector>());
             Pstream::gather(Mv, sumOp<vector>());
 
-            double Ftot[3], Mtot[3]; // these should be in IEC coordinates
+            double Fseg[3], Mseg[3];
+            double Fiec[3], Miec[3]; // these should be in IEC coordinates
             if(Pstream::master())
             {
                 for (int i=0; i<3; ++i) 
@@ -788,21 +792,23 @@ namespace BD
                     //Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
                     //Ftot[i] = Fp[i] + Fv[i];
                     //Mtot[i] = Mp[i] + Mv[i];
-                    Ftot[OFtoIEC[i]] = Fp[i] + Fv[i];
-                    Mtot[OFtoIEC[i]] = Mp[i] + Mv[i];
+                    Fseg[i] = Fp[i] + Fv[i];
+                    Mseg[i] = Mp[i] + Mv[i];
+                    Fiec[OFtoIEC[i]] = Fseg[i];
+                    Miec[OFtoIEC[i]] = Mseg[i];
                 }
 
                 // Update F_foam and M_foam in BeamDyn library
                 //beamDynSetDistributedLoadAtNode(&inode, Ftot, Mtot);
-                beamDynSetDistributedLoad(&ig, Ftot, Mtot);
+                beamDynSetDistributedLoad(&ig, Fiec, Miec);
 
-                // Output loads are in the beamdyn frame
-                loadFile << " " << Ftot[0] 
-                         << " " << Ftot[1] 
-                         << " " << Ftot[2];
-                loadFile << " " << Mtot[0] 
-                         << " " << Mtot[1] 
-                         << " " << Mtot[2];
+                // Output loads are in the OpenFOAM frame
+                loadFile << " " << Fseg[0] 
+                         << " " << Fseg[1] 
+                         << " " << Fseg[2];
+                loadFile << " " << Mseg[0] 
+                         << " " << Mseg[1] 
+                         << " " << Mseg[2];
             }
 
             if (first)
@@ -810,15 +816,25 @@ namespace BD
                 Pstream::gather(nFacesFound, sumOp<int>());
                 //Info<< "  seg " << ig
                 //    << " with " << nFacesFound << " faces btwn " << r0 << " " << r1 << ":"
-                //    << " (" << Ftot[0] << " " << Ftot[1] << " " << Ftot[2] << ") " 
-                //    << " (" << Mtot[0] << " " << Mtot[1] << " " << Mtot[2] << ") " 
+                //    << " (" << Fseg[0] << " " << Fseg[1] << " " << Fseg[2] << ") " 
+                //    << " (" << Mseg[0] << " " << Mseg[1] << " " << Mseg[2] << ") " 
                 //    << endl;
                 Info<< "segment " << ig
                     << " with " << nFacesFound << " faces"
                     << " between " << r0 << " " << r1 << endl;
             }
 
-        } // end loop over beamdyn nodes
+            for (int i=0; i<3; ++i)
+            {
+                Ftot[i] += Fseg[i]*dr;
+                Mtot[i] += Mseg[i]*dr;
+            }
+
+        } // end loop over beamdyn segments
+
+        Info<< "Integrated load passed to BeamDyn:" << endl;
+        Info<< "  F : " << Ftot << endl;
+        Info<< "  M : " << Ftot << endl;
 
         loadFile << std::endl;
 
