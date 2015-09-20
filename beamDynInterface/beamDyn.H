@@ -80,7 +80,7 @@ namespace BD
                                         // - crv0_ptr is NOT USED
 
     // updated from BeamDyn in updateNodePositions() after calling beamDynStep()
-    //vectorList  *pos_ptr, *crv_ptr;     // current position and orientation of beam nodes (IEC coords) -- NOT USED
+    vectorList  *pos_ptr, *crv_ptr;     // current position and orientation of beam nodes (IEC coords)
     vectorList  *disp_ptr;              // linear displacement at beam nodes (IEC coords)
     vectorList  *adisp_ptr;             // angular displacement at beam nodes (IEC coords)
     

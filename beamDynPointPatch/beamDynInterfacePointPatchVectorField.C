@@ -122,11 +122,11 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     //const polyMesh& mesh = this->dimensionedInternalField().mesh()();
     //const Time& t = mesh.time();
 
-    vectorList& uList = BD::linDisp();   // linear displacement at BD nodes in IEC coords
-    vectorList& crvList = BD::angDisp(); // angular displacement at BD nodes in IEC coords
+    vectorList& uList = BD::linDisp();   // linear displacement at BD nodes in OpenFOAM coords
+    vectorList& crvList = BD::angDisp(); // angular displacement at BD nodes in OpenFOAM coords
 
-    vectorList& pList = BD::p();        // surface offset vector
-    vectorList& x1List = BD::x1();      // position vector along beam axis
+    vectorList& pList = BD::p();        // surface offset vector in OpenFOAM coords
+    vectorList& x1List = BD::x1();      // position vector along beam axis in OpenFOAM coords
 
     //
     // --loop over all surface nodes
@@ -140,8 +140,8 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
         {
             for( int i=0; i<3; ++i )
             {
-                u.component(i)   += BD::h()[ptI*BD::N()+inode] *   uList[inode].component(BD::openfoamDir(i));
-                crv.component(i) += BD::h()[ptI*BD::N()+inode] * crvList[inode].component(BD::openfoamDir(i));
+                u.component(i)   += BD::h()[ptI*BD::N()+inode] *   uList[inode].component(i);
+                crv.component(i) += BD::h()[ptI*BD::N()+inode] * crvList[inode].component(i);
             }
         }
 

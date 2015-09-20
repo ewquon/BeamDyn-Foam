@@ -28,12 +28,14 @@ namespace BD
             beamDynStart( &t0, &dt );
             beamDynGetNNodes( &nnodes ); // total number of nodes in beam model
             //Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-            Info<< "...done\n" << endl;
+            //Info<< "...done\n" << endl;
         }
 
         // initialize arrays for storing configuration
         Pstream::scatter(nnodes);
         r_ptr    = new scalarList(nnodes, 0.0);
+        pos_ptr = new vectorList(nnodes, vector::zero);
+        crv_ptr = new vectorList(nnodes, vector::zero);
         pos0_ptr = new vectorList(nnodes, vector::zero);
         crv0_ptr = new vectorList(nnodes, vector::zero);
         disp_ptr = new vectorList(nnodes, vector::zero);
@@ -95,7 +97,7 @@ namespace BD
 
             // get initial configuration (IN IEC COORDINATES)
             double posi[3], crvi[3];
-            Info<< "Initial linear/angular position (IEC coordinates):" << endl;
+            Info<< "Initial linear/angular position from beam.input (IEC coordinates):" << endl;
             for( int inode=0; inode < nnodes; ++inode )
             {
                 beamDynGetNode0InitialPosition( &inode, posi, crvi );
@@ -385,10 +387,10 @@ namespace BD
     void updateNodePositions()
     {
         scalarList &r    = *r_ptr;
-        vectorList &pos0 = *pos0_ptr;
+        //vectorList &pos0 = *pos0_ptr; // not used
         //vectorList &rot0 = *rot0_ptr; // not used
-        //vectorList &pos  = *pos_ptr; // not used
-        //vectorList &crv  = *crv_ptr;
+        vectorList &pos  = *pos_ptr;
+        //vectorList &crv  = *crv_ptr; // not used
         vectorList &disp = *disp_ptr;
         vectorList &adisp= *adisp_ptr;
 
@@ -400,15 +402,19 @@ namespace BD
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             //   TODO: handle multiple elements
+            double cur_pos[3], cur_crv[3]; // note: orientation information (cur_crv) is not used
             double lin_disp[3], ang_disp[3];
             //double ang;
 //            double R[9]; //rotation matrix from BeamDyn
             for( int inode=0; inode<nnodes; ++inode ) 
             {
+                beamDynGetNode0Position( &inode, cur_pos, cur_crv );
+
                 // get node linear/angular displacement [m, crv]
+                // NOTE: THESE ARE IN IEC COORDINATES
                 beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
-// ROTATION SHOULD BE APPLIED FOR THE POINTS ON THE INTERFACE PATCH!!!
+// ROTATION SHOULD BE APPLIED FOR THE POINTS ON THE INTERFACE PATCH?
 //                beamDynGetNode0RotationMatrix( &inode, R );
 // DEBUG/*{{{*/
 // these are identity before the first iteration and approximately the identity matrix afterwards
@@ -428,37 +434,42 @@ namespace BD
 //                }
 //                if(twoD) disp[inode].component(bladeDir) = 0.0;/*}}}*/
 
+                // pos, disp, and adisp are saved in OF coordinates
                 for( int i=0; i<3; ++i )
                 {
-                    disp[inode].component(i) = lin_disp[i];
-                    adisp[inode].component(i)= ang_disp[i];
+                    pos[inode].component(i)   =  cur_pos[OFtoIEC[i]];
+                    disp[inode].component(i)  = lin_disp[OFtoIEC[i]];
+                    adisp[inode].component(i) = ang_disp[OFtoIEC[i]];
                 }
 
                 // used for sectional loads calculation
                 // note: pos0 and disp are in IEC coords, bladeDir is in OpenFOAM coordinates
-                r[inode] = pos0[inode][OFtoIEC[bladeDir]] + disp[inode].component(OFtoIEC[bladeDir]);
+                // THIS DOESN'T WORK ANYMORE--displacements are relative to the previous deformed configuration, 
+                //   not the original undeformed configuration
+                //r[inode] = pos0[inode][OFtoIEC[bladeDir]] + disp[inode].component(OFtoIEC[bladeDir]);
+
+                r[inode] = pos[inode].component(bladeDir);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
                 {
                     //NOTE: for prescribed motion, since the beamdyn solve routine isn't called, the rotation parameters
                     //  are not properly updated so ang_disp will be inaccurate; just use the rotation matrix R instead.
-                    Info<< " " << lin_disp[0] 
-                        << " " << lin_disp[1] 
-                        << " " << lin_disp[2]
-                        << " " << crvToRad(ang_disp[0])*radToDeg
-                        << " " << crvToRad(ang_disp[1])*radToDeg
-                        << " " << crvToRad(ang_disp[2])*radToDeg
+                    Info<< " " << disp[inode][0] 
+                        << " " << disp[inode][1] 
+                        << " " << disp[inode][2]
+                        << " " << crvToRad(adisp[inode][0])*radToDeg
+                        << " " << crvToRad(adisp[inode][1])*radToDeg
+                        << " " << crvToRad(adisp[inode][2])*radToDeg
                         << endl;
                 }
                 else // write subsequent displacements to file
                 {
-                    // note: these are in the beamdyn frame
-                    dispFile << " " << lin_disp[IECtoOF[0]] 
-                             << " " << lin_disp[IECtoOF[1]] 
-                             << " " << lin_disp[IECtoOF[2]];
-                    dispFile << " " << crvToRad(ang_disp[IECtoOF[0]])*radToDeg 
-                             << " " << crvToRad(ang_disp[IECtoOF[1]])*radToDeg 
-                             << " " << crvToRad(ang_disp[IECtoOF[2]])*radToDeg;
+                    dispFile << " " << disp[inode][0] 
+                             << " " << disp[inode][1] 
+                             << " " << disp[inode][2];
+                    dispFile << " " << crvToRad(adisp[inode][0])*radToDeg 
+                             << " " << crvToRad(adisp[inode][1])*radToDeg 
+                             << " " << crvToRad(adisp[inode][2])*radToDeg;
                 }
 
             }// loop over beam nodes
@@ -469,11 +480,11 @@ namespace BD
         }// if Pstream::master
 
         // verified that broadcast of vectorlists work
-        //Pstream::scatter(pos);
+        Pstream::scatter(pos);
         //Pstream::scatter(crv);
-        Pstream::scatter(r); // needed for calculateShapeFunctions()
+        Pstream::scatter(r);    // needed for calculateShapeFunctions() and updateSectionLoads()
         Pstream::scatter(disp); // needed for pointPatchField
-        Pstream::scatter(adisp); // needed for pointPatchField
+        Pstream::scatter(adisp);// needed for pointPatchField
 
     } // end of updateNodePositions()
 
@@ -693,6 +704,7 @@ namespace BD
         Info<< "Calculating section loads for BeamDyn" << endl;
 
         scalarList &r = *r_ptr;
+        vectorList &pos  = *pos_ptr;
         scalar p0( pRef / rhoRef );
 
         // setup arrays, pointers
@@ -705,19 +717,41 @@ namespace BD
         //   note: devReff returns the effective stress tensor including the laminar stress
         //   note: face normals point _outside_ the computational domain
 
-//        Info<< "Calculating surface shear stresses" << endl;
         // Face normals point into solid surface, i.e., outward from fluid volume, 
         // i.e. the direction the fluid is pushing on the wall.
         // This matches the 'forces' function object implementation 
         // in Foam::forces::calcForcesMoment() at
         //   ~/OpenFOAM/OpenFOAM-2.3.1/src/postProcessing/functionObjects/forces/forces/forces.C
-        // - also, no need to normalize by magSf since we multiply by mag(Sf) later
-        const volSymmTensorField Reff(turbulence.devReff());
+        const volSymmTensorField Reff(turbulence.devReff()); // ~ nu_eff * grad(U) ~ [m^2/s^2]
 //THIS DOESN'T COMPILE WITH CLANG:
 //        vectorField bladePatchShearStress = 
 //            mesh.Sf().boundaryField()[interfacePatchID]
 //            & Reff.boundaryField()[interfacePatchID];
         vectorField bladePatchShearStress( bladePatchNormals & Reff.boundaryField()[patchID] );
+
+        vector Fp(vector::zero); // for each section
+        vector Fv(vector::zero);
+        vector Mp(vector::zero);
+        vector Mv(vector::zero);
+        vector Fseg(vector::zero);
+        vector Mseg(vector::zero);
+        double Fiec[3]; // passed to BeamDyn, in IEC coordinates
+        double Miec[3]; // passed to BeamDyn, in IEC coordinates
+
+        vector s(vector::zero);     // vector from start to end of segment
+        vector rc(vector::zero);    // face center position
+        vector Sf;                  // surface normal
+        vector dm;                  // moment arm
+        vector dFp;                 // contribution to pressure force
+        vector dFv;                 // contribution to viscous force
+
+        // debug info, should match output from libforces!!!
+        vector Fp_tot(vector::zero);
+        vector Mp_tot(vector::zero);
+        vector Fv_tot(vector::zero);
+        vector Mv_tot(vector::zero);
+
+        int nFacesFound=0, nFacesTotal=0;
 
         //
         // --loop over nodes in the BeamDyn blade model, assumed single element (TODO)
@@ -725,38 +759,43 @@ namespace BD
         //
         //loadFile << currentTime; // at this point, still equal to t at beginning of time step
         loadFile << currentTime + currentDeltaT;
-        if(first) Info<< "Initial info:" << endl;
-        vector Ftot(vector::zero); // debug info, should match output from libforces!!!
-        vector Mtot(vector::zero);
+        //if(first) Info<< "Initial info:" << endl;
+        Info<< "Current blade section locations : " << r << endl;
         for( int ig=0; ig<nnodes-1; ++ig ) 
         {
-            vector Fp(vector::zero);
-            vector Fv(vector::zero);
-            vector Mp(vector::zero);
-            vector Mv(vector::zero);
+            Fp = vector::zero;
+            Fv = vector::zero;
+            Mp = vector::zero;
+            Mv = vector::zero;
 
             r0 = r[ig];
-            r1 = r[ig+1];
-            scalar dr = r1 - r0; // note: this is the width of the integration segment 
-                                 //       corresponding to the Gauss pt
+            if( ig+1 >= nnodes-1 ) r1 = 9e9; // if the tip section is rotated, then faces away from the beam axis may not be included...
+            else r1 = r[ig+1];
+
+            //scalar dr = r1 - r0; // note: this is the width of the integration segment 
+            //                     //       corresponding to the Gauss pt
+            s = pos[ig+1] - pos[ig];
+            scalar dr = Foam::sqrt( s & s );
+            //Info<< "  seglen " << dr << " " << r[ig+1]-r[ig] << endl;
 
             // 
             // --loop over faces on interface patch
             //
-            int nFacesFound = 0;
+            nFacesFound = 0;
             forAll( bladePatch, faceI )
             {
-                vector rc( bladePatch.faceCentres()[faceI] );
+                rc = bladePatch.faceCentres()[faceI];
                 if( rc[bladeDir] >= r0 && rc[bladeDir] < r1 )
                 {
-                    vector Sf( bladePatchNormals[faceI] ); // surface normal
-                    vector dm( rc - origin );
+                    Sf = bladePatchNormals[faceI]; // surface normal
+                    dm = rc - origin;
 
-                    vector dFp = rhoRef * Sf * (p.boundaryField()[patchID][faceI] - p0) / dr;
+                    dFp = rhoRef * Sf * (p.boundaryField()[patchID][faceI] - p0) / dr;
                     Fp += dFp;
                     Mp += dm ^ dFp;
 
-                    vector dFv = mag(Sf) * bladePatchShearStress[faceI] / dr;
+                    //dFv = rhoRef * mag(Sf) * bladePatchShearStress[faceI] / dr;
+                    dFv = rhoRef * bladePatchShearStress[faceI] / dr;
                     Fv += dFv;
                     Mv += dm ^ dFv;
 
@@ -770,24 +809,17 @@ namespace BD
             Pstream::gather(Mp, sumOp<vector>());
             Pstream::gather(Mv, sumOp<vector>());
 
-            double Fseg[3], Mseg[3];
-            double Fiec[3], Miec[3]; // these should be in IEC coordinates
             if(Pstream::master())
             {
+                Fseg = Fp + Fv;
+                Mseg = Mp + Mv;
                 for (int i=0; i<3; ++i) 
                 {
-                    //Ftot[i] = loadMultiplier*(Fp[i] + Fv[i]);
-                    //Mtot[i] = loadMultiplier*(Mp[i] + Mv[i]);
-                    //Ftot[i] = Fp[i] + Fv[i];
-                    //Mtot[i] = Mp[i] + Mv[i];
-                    Fseg[i] = Fp[i] + Fv[i];
-                    Mseg[i] = Mp[i] + Mv[i];
                     Fiec[OFtoIEC[i]] = Fseg[i];
                     Miec[OFtoIEC[i]] = Mseg[i];
                 }
 
                 // Update F_foam and M_foam in BeamDyn library
-                //beamDynSetDistributedLoadAtNode(&inode, Ftot, Mtot);
                 beamDynSetDistributedLoad(&ig, Fiec, Miec);
 
                 // Output loads are in the OpenFOAM frame
@@ -797,6 +829,12 @@ namespace BD
                 loadFile << " " << Mseg[0] 
                          << " " << Mseg[1] 
                          << " " << Mseg[2];
+
+                Fp_tot += Fp*dr;
+                Mp_tot += Mp*dr;
+                Fv_tot += Fv*dr;
+                Mv_tot += Mv*dr;
+
             }
 
 //            if (first)
@@ -807,22 +845,19 @@ namespace BD
                 //    << " (" << Fseg[0] << " " << Fseg[1] << " " << Fseg[2] << ") " 
                 //    << " (" << Mseg[0] << " " << Mseg[1] << " " << Mseg[2] << ") " 
                 //    << endl;
-                Info<< "seg " << ig
-                    << " : " << nFacesFound << " faces"
-                    << " [ " << r0 << " " << r1 << " ]" << endl;
+                Info<< "seg" << ig
+                    << " (len err= " << r[ig+1]-r[ig] - dr << " )"
+                    << " : " << nFacesFound << " faces" << endl;
 //            }
 
-            for (int i=0; i<3; ++i)
-            {
-                Ftot[i] += Fseg[i]*dr;
-                Mtot[i] += Mseg[i]*dr;
-            }
+            nFacesTotal += nFacesFound;
 
-        } // end loop over beamdyn segments
+        } // end loop over beam segments
 
-        Info<< "Integrated load passed to BeamDyn:" << endl;
-        Info<< "  F : " << Ftot << endl;
-        Info<< "  M : " << Ftot << endl;
+        Info<< "Integrated over " << nFacesTotal << " faces" << endl;
+        Info<< "Total loads passed to BeamDyn (should match forces output!):" << endl;
+        Info<< "  F : " << Fp_tot << " " << Fv_tot << endl;
+        Info<< "  M : " << Mp_tot << " " << Mv_tot << endl;
 
         loadFile << std::endl;
 
@@ -832,7 +867,7 @@ namespace BD
 
     // disp is the interpolated displacement vector that will be rotated
     // adisp is the interpolated angular displacement
-//    void rotateDisplacementVector(double* disp, double* adisp)
+//    void rotateDisplacementVector(double* disp, double* adisp)/*{{{*/
 //    {
 //        double disp0[3];
 //        for( int i=0; i<3; ++i) { disp0[i] = disp[i]; }
@@ -860,7 +895,7 @@ namespace BD
 //            << disp[0] << ","
 //            << disp[1] << ","
 //            << disp[2] << endl;
-//    }
+//    }/*}}}*/
 
     // crv should be interpolated and in the OpenFOAM ref frame
     void rotateVector(vector v, const vector crv)
