@@ -75,20 +75,22 @@ namespace BD
     double      *h_ptr;                 // shape functions [ # CFD nodes * # BD nodes ]
     vectorList  *p_ptr;                 // surface offset vectors
 
-    scalarList  *r_ptr;                 // spanwise coordinates of beam nodes used to calculate shape functions
-                                        // - calculated in updateNodePositions() at the end of BD::start()
-
     vectorList  *pos0_ptr,*crv0_ptr;    // starting position and orientation of beam nodes (IEC coords)
                                         // - pos0_ptr used to evaluate r to calculate shape functions
                                         // - crv0_ptr is NOT USED
 
-    // calculated in updateNodePositions() after calling beamDynStep()
+    // updated from BeamDyn in updateNodePositions() after calling beamDynStep()
     //vectorList  *pos_ptr, *crv_ptr;     // current position and orientation of beam nodes (IEC coords) -- NOT USED
     vectorList  *disp_ptr;              // linear displacement at beam nodes (IEC coords)
     vectorList  *adisp_ptr;             // angular displacement at beam nodes (IEC coords)
     
     // calculated at all t
     vectorList  *x1_ptr;                // position vector along the beam (x1) axis
+                                        // - initial value calculated by calculateInitialDisplacementVectors()
+                                        // - updated every time step by beamDynInterfacePointPatchField::updateCoeffs()
+    scalarList  *r_ptr;                 // spanwise coordinates of beam nodes used to calculate shape functions
+                                        // - calculated in updateNodePositions()
+
 
     //
     // access functions
@@ -104,7 +106,7 @@ namespace BD
     double* h() { return h_ptr; };                // shape functions
     label N() { return nnodes; };                 // number of beamdyn nodes
     Switch enforce2D() { return twoD; };          // force 2D displacements
-    label bladeDirection() { return bladeDir; };
+    label bladeDirection() { return bladeDir; };  // in OpenFOAM coordinates
     label openfoamDir(label dir) { return IECtoOF[dir]; };
     vectorList& p() { return *p_ptr; };           // surface node offset
     vectorList& x1() { return *x1_ptr; };         // beam axis position

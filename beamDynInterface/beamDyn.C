@@ -75,14 +75,14 @@ namespace BD
                 //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
-                dispFile.open("disp.out", std::ios::in | std::ios::out | std::ios::app);
+                dispFile.open("rel_disp.out", std::ios::in | std::ios::out | std::ios::app);
             }
             else
             {
                 //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::out);
-                dispFile.open("disp.out", std::ios::out);
+                dispFile.open("rel_disp.out", std::ios::out);
             }
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
             if (!dispFile.is_open()) Info<< "Problem opening disp.out???" << endl;
@@ -93,9 +93,9 @@ namespace BD
             loadFile.precision(8);
             dispFile.precision(8);
 
-            // get initial configuration (IN BEAMDYN COORDINATES)
+            // get initial configuration (IN IEC COORDINATES)
             double posi[3], crvi[3];
-            Info<< "Initial linear/angular position:" << endl;
+            Info<< "Initial linear/angular position (IEC coordinates):" << endl;
             for( int inode=0; inode < nnodes; ++inode )
             {
                 beamDynGetNode0InitialPosition( &inode, posi, crvi );
@@ -380,12 +380,8 @@ namespace BD
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    // Retrieve disp array from the BeamDyn library
+    // Calls beamDynGetNode0Displacement to retrieve disp and adisp array from the BeamDyn library
     // TODO: clean this up?
-    // - updates pos/rot, used to calculate disp
-    // - updates disp, accessed through BD::disp() in beamDynInterfacePointPatch::updateCoeffs()
-    // - updates r, used by updateSectionLoads()
-    // - writes displacement at the starting time step to disp.out
     void updateNodePositions()
     {
         scalarList &r    = *r_ptr;
@@ -399,7 +395,7 @@ namespace BD
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
-            if (first) Info<< "Initial displacements from BeamDyn lib [m,deg]: " << endl;
+            if (first) Info<< "Initial displacements from BeamDyn lib (IEC corods) [m,deg]: " << endl;
             else dispFile << currentTime;
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
@@ -439,7 +435,7 @@ namespace BD
                 }
 
                 // used for sectional loads calculation
-                // note: pos0 and disp are in IEC coords
+                // note: pos0 and disp are in IEC coords, bladeDir is in OpenFOAM coordinates
                 r[inode] = pos0[inode][OFtoIEC[bladeDir]] + disp[inode].component(OFtoIEC[bladeDir]);
 
                 if (first) // print out initial displaced config, either 0's or (hopefully) repeated on restart
@@ -700,6 +696,7 @@ namespace BD
         scalar p0( pRef / rhoRef );
 
         // setup arrays, pointers
+        // note: patchID is set by readInputs()
         double r0, r1;
         const polyPatch& bladePatch = mesh.boundaryMesh()[patchID];
         const vectorField& bladePatchNormals = mesh.Sf().boundaryField()[patchID];
@@ -709,13 +706,6 @@ namespace BD
         //   note: face normals point _outside_ the computational domain
 
 //        Info<< "Calculating surface shear stresses" << endl;
-//        const volSymmTensorField Reff(turbulence.devReff());
-//        vectorField bladePatchShearStress = 
-//            (
-//                -mesh.Sf().boundaryField()[interfacePatchID]
-//                /mesh.magSf().boundaryField()[interfacePatchID]
-//            ) & Reff.boundaryField()[interfacePatchID];
-
         // Face normals point into solid surface, i.e., outward from fluid volume, 
         // i.e. the direction the fluid is pushing on the wall.
         // This matches the 'forces' function object implementation 
@@ -723,22 +713,20 @@ namespace BD
         //   ~/OpenFOAM/OpenFOAM-2.3.1/src/postProcessing/functionObjects/forces/forces/forces.C
         // - also, no need to normalize by magSf since we multiply by mag(Sf) later
         const volSymmTensorField Reff(turbulence.devReff());
-        //THIS DOESN'T COMPILE WITH CLANG:
-        //vectorField bladePatchShearStress = 
-        //    mesh.Sf().boundaryField()[interfacePatchID]
-        //    & Reff.boundaryField()[interfacePatchID];
+//THIS DOESN'T COMPILE WITH CLANG:
+//        vectorField bladePatchShearStress = 
+//            mesh.Sf().boundaryField()[interfacePatchID]
+//            & Reff.boundaryField()[interfacePatchID];
         vectorField bladePatchShearStress( bladePatchNormals & Reff.boundaryField()[patchID] );
 
         //
-        // --loop over nodes in the BeamDyn blade model, assumed single element
+        // --loop over nodes in the BeamDyn blade model, assumed single element (TODO)
         //   i.e., nnodes = nodes_elem = order_elem+1 = ngp+1
         //
         //loadFile << currentTime; // at this point, still equal to t at beginning of time step
         loadFile << currentTime + currentDeltaT;
-//        Info<< "Integrating sectional loads" << endl;
         if(first) Info<< "Initial info:" << endl;
-        //double Ftot[3], Mtot[3];
-        vector Ftot(vector::zero);
+        vector Ftot(vector::zero); // debug info, should match output from libforces!!!
         vector Mtot(vector::zero);
         for( int ig=0; ig<nnodes-1; ++ig ) 
         {
@@ -811,18 +799,18 @@ namespace BD
                          << " " << Mseg[2];
             }
 
-            if (first)
-            {
+//            if (first)
+//            {
                 Pstream::gather(nFacesFound, sumOp<int>());
                 //Info<< "  seg " << ig
                 //    << " with " << nFacesFound << " faces btwn " << r0 << " " << r1 << ":"
                 //    << " (" << Fseg[0] << " " << Fseg[1] << " " << Fseg[2] << ") " 
                 //    << " (" << Mseg[0] << " " << Mseg[1] << " " << Mseg[2] << ") " 
                 //    << endl;
-                Info<< "segment " << ig
-                    << " with " << nFacesFound << " faces"
-                    << " between " << r0 << " " << r1 << endl;
-            }
+                Info<< "seg " << ig
+                    << " : " << nFacesFound << " faces"
+                    << " [ " << r0 << " " << r1 << " ]" << endl;
+//            }
 
             for (int i=0; i<3; ++i)
             {
