@@ -225,13 +225,13 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        << maxTwist*180.0/Foam::constant::mathematical::pi << " deg" << endl;
 //    Info<< "- TEST: node coords, pt disp vec : " << localPoints[0] << " " << this->operator[](0) << endl;
 
-    Info<< "  max deltaV due to rotation : " << maxDeltaV << endl;
+    Pout<< "  max deltaV due to rotation : " << maxDeltaV << endl;
 
     label idx;
     forAll(BD::trackedPoints(),ptI)
     {
         idx = BD::trackedPoints()[ptI];
-        Info<< "Tracked pt " << idx << " pos/disp : " << localPoints[idx] << " " << this->operator[](idx) << endl;
+        Pout<< "Tracked pt " << idx << " cur pos/disp : " << localPoints[idx] << " " << this->operator[](idx) << endl;
     }
 
     fixedValuePointPatchField<vector>::updateCoeffs();

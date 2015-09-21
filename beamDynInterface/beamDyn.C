@@ -726,6 +726,15 @@ namespace BD
         {
             Info<< "Problem opening " << fname << " for writing... " << endl;
         }
+
+        // diagnostic
+        label idx;
+        forAll((*trackedPts_ptr),ptI)
+        {
+            idx = (*trackedPts_ptr)[ptI];
+            Pout<< "Tracked pt " << idx << " surf offset : " << (*p_ptr)[idx] << endl;
+        }
+
     }
 
     //*********************************************************************************************
