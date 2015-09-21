@@ -65,6 +65,7 @@ namespace BD
 
     std::fstream loadFile;
     std::fstream dispFile;
+    std::fstream trackFile;
 
     int nnodes=0;
     
@@ -78,6 +79,8 @@ namespace BD
     vectorList  *pos0_ptr,*crv0_ptr;    // starting position and orientation of beam nodes (IEC coords)
                                         // - pos0_ptr used to evaluate r to calculate shape functions
                                         // - crv0_ptr is NOT USED
+
+    labelList   *trackedPts_ptr;        // tracked points from pointSet "trackedPoints" (generated with topoSet)
 
     // updated from BeamDyn in updateNodePositions() after calling beamDynStep()
     vectorList  *pos_ptr, *crv_ptr;     // current position and orientation of beam nodes (IEC coords)

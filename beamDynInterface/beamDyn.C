@@ -3,6 +3,8 @@
 
 #include "fvCFD.H"
 
+#include "pointSet.H" // for tracking a set of points, e.g. at the blade tip
+
 #include <limits>
 
 namespace BD
@@ -78,6 +80,8 @@ namespace BD
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
                 dispFile.open("rel_disp.out", std::ios::in | std::ios::out | std::ios::app);
+                trackFile.open("trackedPoints.out", std::ios::in | std::ios::out | std::ios::app);
+
             }
             else
             {
@@ -85,15 +89,18 @@ namespace BD
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::out);
                 dispFile.open("rel_disp.out", std::ios::out);
+                trackFile.open("trackedPoints.out", std::ios::out);
             }
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
-            if (!dispFile.is_open()) Info<< "Problem opening disp.out???" << endl;
+            if (!dispFile.is_open()) Info<< "Problem opening rel_disp.out???" << endl;
+            if (!trackFile.is_open()) Info<< "Problem opening trackedPoints.out???" << endl;
 
             //Info<< "Setting precision to " << std::numeric_limits<double>::digits10 << endl;
             //loadFile.precision(std::numeric_limits<double>::digits10);
             //dispFile.precision(std::numeric_limits<double>::digits10);
             loadFile.precision(8);
             dispFile.precision(8);
+            trackFile.precision(8);
 
             // get initial configuration (IN IEC COORDINATES)
             double posi[3], crvi[3];
@@ -217,6 +224,22 @@ namespace BD
         //    << prescribed_max_rotation << endl;
         //prescribed_max_rotation *= Foam::constant::mathematical::pi/180;
 
+        pointSet trackedPts(
+               mesh,
+               "trackedPoints",
+               Foam::IOobject::READ_IF_PRESENT,
+               Foam::IOobject::NO_WRITE
+        );
+        trackedPts_ptr = new labelList(trackedPts.size());
+        Info<< "Tracked points:" << endl;
+        label idx;
+        forAll( trackedPts, ptI )
+        {
+            idx = trackedPts.toc()[ptI];
+            (*trackedPts_ptr)[ptI] = idx;
+            Info<< ptI << " : " << idx << " " << mesh.points()[idx] << endl;
+        }
+
     }
 
     //*********************************************************************************************
@@ -245,21 +268,38 @@ namespace BD
         {
             loadFile.close();
             dispFile.close();
+            trackFile.close();
         }
     }
 
     //*********************************************************************************************
 
-    void update( double t, double dt )
+    void update( double t, double dt, const dynamicFvMesh& mesh )
     {
 //        Info<< "================================" << endl;
 //        Info<< "| Calling BeamDyn update" << endl;
 //        Info<< "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv" << endl;
         currentTime = t; // do we really need to save this?
         currentDeltaT = dt;
+
         if(Pstream::master()) 
         {
+            // output tracked point positions for the current time step
+            trackFile << t;
+            forAll( *trackedPts_ptr, ptI )
+            {
+                for( int i=0; i<3; ++i )
+                {
+                    trackFile << " " << mesh.points()[ (*trackedPts_ptr)[ptI] ][i];
+                }
+            }
+            trackFile << std::endl;
+
+            // update the beam state
             beamDynStep( &dt ); // NOTE: dt isn't actually used!
+
+            // check mesh quality
+            Info<< "  deformed mesh min volume : " << min( mesh.V() ).value() << endl;
         }
 //        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << nl << endl;
         updateNodePositions();

@@ -48,7 +48,10 @@ namespace BD
                              const volScalarField& p, 
                              const incompressible::turbulenceModel& turbulence );
 
-    void update( double t, double dt );
+    //void update( double t, double dt );
+    void update( double t,
+                 double dt,
+                 const dynamicFvMesh& mesh );
     //void updatePrescribedDeflection( double t );
 
     void updateNodePositions();
