@@ -64,7 +64,8 @@ namespace BD
     bool restarted=0;
 
     std::fstream loadFile;
-    std::fstream dispFile;
+    //std::fstream dispFile;
+    std::fstream posFile;
     std::fstream trackFile;
 
     int nnodes=0;
@@ -103,8 +104,10 @@ namespace BD
     label interfacePatchID() { return patchID; };
 
     //-used by boundary patch
-    vectorList& linDisp() { return *disp_ptr; };  // linear displacement
-    vectorList& angDisp() { return *adisp_ptr; }; // angular displacement
+    vectorList& pos() { return *pos_ptr; };  // linear displacement --NOT USED
+    vectorList& crv() { return *crv_ptr; }; // angular displacement --NOT USED
+    //vectorList& linDisp() { return *disp_ptr; };  // linear displacement --NOT USED
+    //vectorList& angDisp() { return *adisp_ptr; }; // angular displacement --NOT USED
     //scalarList& r() { return *r_ptr; };           // beam coordinate at beamdyn nodes --NOT USED
     double* h() { return h_ptr; };                // shape functions
     label N() { return nnodes; };                 // number of beamdyn nodes

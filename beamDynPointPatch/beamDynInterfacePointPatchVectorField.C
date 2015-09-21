@@ -110,8 +110,9 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
 //    double minTwist=9e9, maxTwist=-9e9;
 
-    vector u(vector::zero); // interpolated linear displacement
+    vector pos(vector::zero); // interpolated linear displacement
     vector crv(vector::zero); // interpolated angular displacement
+    vector p(vector::zero); // position vector from beam curve to a surface node
 
     //- patch coordinates, if needed
     //const labelList& meshPoints = patch().meshPoints(); // returns polyPatch_.meshPoints(), i.e. node IDs
@@ -122,11 +123,11 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     //const polyMesh& mesh = this->dimensionedInternalField().mesh()();
     //const Time& t = mesh.time();
 
-    vectorList& uList = BD::linDisp();   // linear displacement at BD nodes in OpenFOAM coords
-    vectorList& crvList = BD::angDisp(); // angular displacement at BD nodes in OpenFOAM coords
+    vectorList& posList = BD::pos(); // position of BD nodes in OpenFOAM coords
+    vectorList& crvList = BD::crv(); // orientation of BD nodes in OpenFOAM coords
 
     vectorList& pList = BD::p();        // surface offset vector in OpenFOAM coords
-    vectorList& x1List = BD::x1();      // position vector along beam axis in OpenFOAM coords
+    //vectorList& x1List = BD::x1();      // position vector along beam axis in OpenFOAM coords
 
     //
     // --loop over all surface nodes
@@ -134,26 +135,27 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     forAll(*this, ptI)
     {
         // interpolate displacement from pre-calculated shape function
-        u   = vector::zero; // in OpenFoam coords
+        pos = vector::zero; // in OpenFoam coords
         crv = vector::zero; // in OpenFoam coords
         for( int inode=0; inode<BD::N(); ++inode )
         {
             for( int i=0; i<3; ++i )
             {
-                u.component(i)   += BD::h()[ptI*BD::N()+inode] *   uList[inode].component(i);
+                pos.component(i) += BD::h()[ptI*BD::N()+inode] * posList[inode].component(i);
                 crv.component(i) += BD::h()[ptI*BD::N()+inode] * crvList[inode].component(i);
             }
         }
 
         // calculate vector components
-        vector x1 = x1List[ptI] + u;    // in OpenFoam coords
-        vector p = pList[ptI];          // in OpenFoam coords
-        BD::rotateVector( p, crv );     // rotates p, in OpenFoam coords
+        //vector x1 = x1List[ptI] + u;    // in OpenFoam coords
+        p = pList[ptI];                 // in OpenFoam coords
 
 /////////////////////////////////////////////////////////////////////
 // TODO: general rotations, retrieve rotation matrix -- need VABS...
-// for now, simple rotation about x0-axis (in BD frame) with cross sections remaining planar
 /////////////////////////////////////////////////////////////////////
+        BD::rotateVector( p, crv );     // rotates p, in OpenFoam coords
+
+// for now, simple rotation about x0-axis (in BD frame) with cross sections remaining planar
 //        ang = a.component(BD::bladeDirection());
 //        minTwist = min(minTwist,ang);
 //        maxTwist = max(maxTwist,ang);
@@ -170,18 +172,22 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        //this->operator[](ptI) = u;
 //        this->operator[](ptI) = u + v;
 
-        this->operator[](ptI) = x1 + p - localPoints[ptI];
+//        this->operator[](ptI) = x1 + p - localPoints[ptI];
 //        Info<< " x: " << localPoints[ptI] << endl;
 //        Info<< " u: " << u << endl;
 //        Info<< "x1: " << x1List[ptI] << endl;
 //        Info<< " p: " << pList[ptI] << endl << endl;
 
+        // new position is at x = pos + p
+        // pointDisplacement values are relative to the current deformed configuration
+        this->operator[](ptI) = pos + p - localPoints[ptI];
+
         // for testing
         if(BD::enforce2D()) this->operator[](ptI).component(BD::bladeDirection()) = 0.0;
 
         // update displacement vector lists
-        pList[ptI] = p;
-        x1List[ptI] = x1;
+//        pList[ptI] = p;
+//        x1List[ptI] = x1;
 
     } //loop over all (surface) nodes on patch
 

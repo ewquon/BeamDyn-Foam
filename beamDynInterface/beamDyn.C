@@ -79,7 +79,8 @@ namespace BD
                 //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
-                dispFile.open("rel_disp.out", std::ios::in | std::ios::out | std::ios::app);
+                //dispFile.open("rel_disp.out", std::ios::in | std::ios::out | std::ios::app);
+                posFile.open("position.out", std::ios::in | std::ios::out | std::ios::app);
                 trackFile.open("trackedPoints.out", std::ios::in | std::ios::out | std::ios::app);
 
             }
@@ -88,18 +89,21 @@ namespace BD
                 //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::out);
-                dispFile.open("rel_disp.out", std::ios::out);
+                //dispFile.open("rel_disp.out", std::ios::out);
+                posFile.open("position.out", std::ios::out);
                 trackFile.open("trackedPoints.out", std::ios::out);
             }
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
-            if (!dispFile.is_open()) Info<< "Problem opening rel_disp.out???" << endl;
+            //if (!dispFile.is_open()) Info<< "Problem opening rel_disp.out???" << endl;
+            if (!posFile.is_open()) Info<< "Problem opening position.out???" << endl;
             if (!trackFile.is_open()) Info<< "Problem opening trackedPoints.out???" << endl;
 
             //Info<< "Setting precision to " << std::numeric_limits<double>::digits10 << endl;
             //loadFile.precision(std::numeric_limits<double>::digits10);
             //dispFile.precision(std::numeric_limits<double>::digits10);
             loadFile.precision(8);
-            dispFile.precision(8);
+            //dispFile.precision(8);
+            posFile.precision(8);
             trackFile.precision(8);
 
             // get initial configuration (IN IEC COORDINATES)
@@ -267,7 +271,8 @@ namespace BD
         if (Pstream::master())
         {
             loadFile.close();
-            dispFile.close();
+            //dispFile.close();
+            posFile.close();
             trackFile.close();
         }
     }
@@ -405,12 +410,12 @@ namespace BD
         beamDynWriteState( fname.c_str() );
 
         // latest vectorList of surface node offsets and positions along the beam axis
-        fname = createFname("dispVectors.dat");
+        fname = createFname("surfaceDisplacementVectors.dat");
         Foam::OFstream ofile(fname);
         if( ofile )
         {
             ofile << (*p_ptr);
-            ofile << (*x1_ptr);
+//            ofile << (*x1_ptr);
         }
         else Pout<< "WARNING error opening " << fname << endl;
     }
@@ -430,56 +435,36 @@ namespace BD
         //vectorList &pos0 = *pos0_ptr; // not used
         //vectorList &rot0 = *rot0_ptr; // not used
         vectorList &pos  = *pos_ptr;
-        //vectorList &crv  = *crv_ptr; // not used
-        vectorList &disp = *disp_ptr;
-        vectorList &adisp= *adisp_ptr;
+        vectorList &crv  = *crv_ptr;
+        //vectorList &disp = *disp_ptr; // not used
+        //vectorList &adisp= *adisp_ptr; // not used
 
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
             if (first) Info<< "Initial displacements from BeamDyn lib (IEC corods) [m,deg]: " << endl;
-            else dispFile << currentTime;
+            //else dispFile << currentTime;
+            else posFile << currentTime;
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             //   TODO: handle multiple elements
             double cur_pos[3], cur_crv[3]; // note: orientation information (cur_crv) is not used
-            double lin_disp[3], ang_disp[3];
-            //double ang;
-//            double R[9]; //rotation matrix from BeamDyn
+//            double lin_disp[3], ang_disp[3];
             for( int inode=0; inode<nnodes; ++inode ) 
             {
                 beamDynGetNode0Position( &inode, cur_pos, cur_crv );
 
                 // get node linear/angular displacement [m, crv]
                 // NOTE: THESE ARE IN IEC COORDINATES
-                beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
-
-// ROTATION SHOULD BE APPLIED FOR THE POINTS ON THE INTERFACE PATCH?
-//                beamDynGetNode0RotationMatrix( &inode, R );
-// DEBUG/*{{{*/
-// these are identity before the first iteration and approximately the identity matrix afterwards
-//                Info << "DEBUG R matrix " << inode << " : \n";
-//                Info << " R=[" << R[0] << " " << R[1] << " " << R[2] << "; ...\n";
-//                Info << "    " << R[3] << " " << R[4] << " " << R[5] << "; ...\n";
-//                Info << "    " << R[6] << " " << R[7] << " " << R[8] << "]\n";
-//
-//                disp[inode] = vector::zero;
-//                for( int j=0; j<3; ++j ) {
-//                    for( int i=0; i<3; ++i )
-//                    {
-//                        disp[inode].component(j) += R[3*j+i] * lin_disp[i];
-//                    }
-//
-//                    //disp[inode].component(j) = lin_disp[j];
-//                }
-//                if(twoD) disp[inode].component(bladeDir) = 0.0;/*}}}*/
+//                beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
                 // pos, disp, and adisp are saved in OF coordinates
                 for( int i=0; i<3; ++i )
                 {
                     pos[inode].component(i)   =  cur_pos[OFtoIEC[i]];
-                    disp[inode].component(i)  = lin_disp[OFtoIEC[i]];
-                    adisp[inode].component(i) = ang_disp[OFtoIEC[i]];
+                    crv[inode].component(i)   =  cur_crv[OFtoIEC[i]];
+ //                   disp[inode].component(i)  = lin_disp[OFtoIEC[i]];
+ //                   adisp[inode].component(i) = ang_disp[OFtoIEC[i]];
                 }
 
                 // used for sectional loads calculation
@@ -494,28 +479,42 @@ namespace BD
                 {
                     //NOTE: for prescribed motion, since the beamdyn solve routine isn't called, the rotation parameters
                     //  are not properly updated so ang_disp will be inaccurate; just use the rotation matrix R instead.
-                    Info<< " " << disp[inode][0] 
-                        << " " << disp[inode][1] 
-                        << " " << disp[inode][2]
-                        << " " << crvToRad(adisp[inode][0])*radToDeg
-                        << " " << crvToRad(adisp[inode][1])*radToDeg
-                        << " " << crvToRad(adisp[inode][2])*radToDeg
+//                    Info<< " " << disp[inode][0] 
+//                        << " " << disp[inode][1] 
+//                        << " " << disp[inode][2]
+//                        << " " << crvToRad(adisp[inode][0])*radToDeg
+//                        << " " << crvToRad(adisp[inode][1])*radToDeg
+//                        << " " << crvToRad(adisp[inode][2])*radToDeg
+//                        << endl;
+                    Info<< " " << pos[inode][0] 
+                        << " " << pos[inode][1] 
+                        << " " << pos[inode][2]
+                        << " " << crvToRad(crv[inode][0])*radToDeg
+                        << " " << crvToRad(crv[inode][1])*radToDeg
+                        << " " << crvToRad(crv[inode][2])*radToDeg
                         << endl;
                 }
                 else // write subsequent displacements to file
                 {
-                    dispFile << " " << disp[inode][0] 
-                             << " " << disp[inode][1] 
-                             << " " << disp[inode][2];
-                    dispFile << " " << crvToRad(adisp[inode][0])*radToDeg 
-                             << " " << crvToRad(adisp[inode][1])*radToDeg 
-                             << " " << crvToRad(adisp[inode][2])*radToDeg;
+//                    dispFile << " " << disp[inode][0] 
+//                             << " " << disp[inode][1] 
+//                             << " " << disp[inode][2];
+//                    dispFile << " " << crvToRad(adisp[inode][0])*radToDeg 
+//                             << " " << crvToRad(adisp[inode][1])*radToDeg 
+//                             << " " << crvToRad(adisp[inode][2])*radToDeg;
+                    posFile << " " << pos[inode][0] 
+                            << " " << pos[inode][1] 
+                            << " " << pos[inode][2];
+                    posFile << " " << crvToRad(crv[inode][0])*radToDeg 
+                            << " " << crvToRad(crv[inode][1])*radToDeg 
+                            << " " << crvToRad(crv[inode][2])*radToDeg;
                 }
 
             }// loop over beam nodes
 
             if (first) Info<< endl;
-            else dispFile << std::endl;
+            //else dispFile << std::endl;
+            else posFile << std::endl;
 
         }// if Pstream::master
 
@@ -523,8 +522,8 @@ namespace BD
         Pstream::scatter(pos);
         //Pstream::scatter(crv);
         Pstream::scatter(r);    // needed for calculateShapeFunctions() and updateSectionLoads()
-        Pstream::scatter(disp); // needed for pointPatchField
-        Pstream::scatter(adisp);// needed for pointPatchField
+//        Pstream::scatter(disp); // needed for pointPatchField
+//        Pstream::scatter(adisp);// needed for pointPatchField
 
     } // end of updateNodePositions()
 
@@ -668,7 +667,7 @@ namespace BD
         if( nSurfNodes==0 ) return;
 
         p_ptr  = new vectorList(nSurfNodes, vector::zero);
-        x1_ptr = new vectorList(nSurfNodes, vector::zero);
+//        x1_ptr = new vectorList(nSurfNodes, vector::zero);
 
         // read if restart
         if( restarted ) 
@@ -680,7 +679,7 @@ namespace BD
             if(ifile)
             {
                 ifile >> (*p_ptr);
-                ifile >> (*x1_ptr);
+//                ifile >> (*x1_ptr);
                 return;
             }
             Info<< "Problem opening " << fname << "... " << endl;
@@ -692,7 +691,7 @@ namespace BD
         {
             (*p_ptr)[ptI] = pf[ptI];
             (*p_ptr)[ptI][bladeDir] = 0;
-            (*x1_ptr)[ptI][bladeDir] = pf[ptI].component(bladeDir);
+ //           (*x1_ptr)[ptI][bladeDir] = pf[ptI].component(bladeDir);
         }
     }
 

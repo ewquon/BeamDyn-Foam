@@ -20,8 +20,10 @@ namespace BD
     label interfacePatchID();
 
     //-used by boundary patch
-    vectorList& linDisp();
-    vectorList& angDisp();
+    vectorList& pos();
+    vectorList& crv();
+    //vectorList& linDisp();
+    //vectorList& angDisp();
     //scalarList& r();
     double* h();
     label N();
