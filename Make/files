@@ -2,4 +2,6 @@ beamDynInterface/beamDyn.C
 
 beamDynPointPatch/beamDynInterfacePointPatchVectorField.C
 
+linearElasticity/displacementLinearElasticityFvMotionSolver.C
+
 LIB = $(FOAM_USER_LIBBIN)/libBeamDynInterface
