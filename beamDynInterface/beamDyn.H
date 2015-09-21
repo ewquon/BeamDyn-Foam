@@ -106,6 +106,7 @@ namespace BD
     //-used by boundary patch
     vectorList& pos() { return *pos_ptr; };  // linear displacement
     vectorList& crv() { return *crv_ptr; }; // angular displacement
+    vectorList& crv0() { return *crv0_ptr; }; // angular displacement
     vectorList& linDisp() { return *disp_ptr; };  // linear displacement
     vectorList& angDisp() { return *adisp_ptr; }; // angular displacement
     //scalarList& r() { return *r_ptr; };           // beam coordinate at beamdyn nodes --NOT USED

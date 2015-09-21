@@ -22,6 +22,7 @@ namespace BD
     //-used by boundary patch
     vectorList& pos();
     vectorList& crv();
+    vectorList& crv0();
     vectorList& linDisp();
     vectorList& angDisp();
     //scalarList& r();
@@ -59,7 +60,7 @@ namespace BD
 
     void updateNodePositions();
 
-    void rotateVector( vector v,
+    void rotateVector( vector& v,
                        const vector crv );
 
     void write( std::string timeName, bool writeNow );

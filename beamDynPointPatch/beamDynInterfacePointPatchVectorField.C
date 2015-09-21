@@ -112,6 +112,7 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
     vector pos(vector::zero); // interpolated linear position
     vector crv(vector::zero); // interpolated angular position
+    vector crv0(vector::zero); // interpolated initial angular position
     vector p(vector::zero); // position vector from beam curve to a surface node
     vector linDisp(vector::zero); // interpolated linear displacement
     vector angDisp(vector::zero); // inteprolated angular displacement
@@ -127,6 +128,7 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
     vectorList& posList = BD::pos(); // position of BD nodes in OpenFOAM coords
     vectorList& crvList = BD::crv(); // orientation of BD nodes in OpenFOAM coords
+    vectorList& crv0List = BD::crv0(); // orientation of BD nodes in OpenFOAM coords
     //vectorList& linDispList = BD::linDisp(); // position of BD nodes in OpenFOAM coords
     //vectorList& angDispList = BD::angDisp(); // orientation of BD nodes in OpenFOAM coords
 
@@ -141,14 +143,16 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
         // interpolate displacement from pre-calculated shape function
         pos = vector::zero; // in OpenFoam coords
         crv = vector::zero; // in OpenFoam coords
+        crv0 = vector::zero;
         //linDisp = vector::zero;
         //angDisp = vector::zero;
         for( int inode=0; inode<BD::N(); ++inode )
         {
             for( int i=0; i<3; ++i )
             {
-                pos.component(i) += BD::h()[ptI*BD::N()+inode] * posList[inode].component(i);
-                crv.component(i) += BD::h()[ptI*BD::N()+inode] * crvList[inode].component(i);
+                pos.component(i)  += BD::h()[ptI*BD::N()+inode] *  posList[inode].component(i);
+                crv.component(i)  += BD::h()[ptI*BD::N()+inode] *  crvList[inode].component(i);
+                crv0.component(i) += BD::h()[ptI*BD::N()+inode] * crv0List[inode].component(i);
                 //linDisp.component(i) += BD::h()[ptI*BD::N()+inode] * linDispList[inode].component(i);
                 //angDisp.component(i) += BD::h()[ptI*BD::N()+inode] * angDispList[inode].component(i);
             }
@@ -161,9 +165,11 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 /////////////////////////////////////////////////////////////////////
 // TODO: general rotations, retrieve rotation matrix -- need VABS...
 /////////////////////////////////////////////////////////////////////
-        BD::rotateVector( p, crv );     // rotates p, in OpenFoam coords
+        //BD::rotateVector( p, crv );     // rotates p, in OpenFoam coords
+        BD::rotateVector( p, crv-crv0 );     // rotates p, in OpenFoam coords
+        //Info<< "  rotation change " << p - pList[ptI] << endl;
 
-// for now, simple rotation about x0-axis (in BD frame) with cross sections remaining planar
+// simple rotation about x0-axis (in BD frame) with cross sections remaining planar/*{{{*/
 //        ang = a.component(BD::bladeDirection());
 //        minTwist = min(minTwist,ang);
 //        maxTwist = max(maxTwist,ang);
@@ -174,7 +180,7 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        v[BD::openfoamDir(2)] = localPoints[ptI].component(BD::openfoamDir(1)) * Foam::sin(ang) 
 //                              + localPoints[ptI].component(BD::openfoamDir(2)) * Foam::cos(ang)
 //                              - localPoints[ptI].component(BD::openfoamDir(2));
-//
+///*}}}*/
 
         // Apply displacement
 //        //this->operator[](ptI) = u;

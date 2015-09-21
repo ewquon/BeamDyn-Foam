@@ -108,13 +108,13 @@ namespace BD
 
             // get initial configuration (IN IEC COORDINATES)
             double posi[3], crvi[3];
-            Info<< "Initial linear/angular position from beam.input (IEC coordinates):" << endl;
+            Info<< "Initial linear/angular position from beam.input (IEC coordinates) [m,deg]:" << endl;
             for( int inode=0; inode < nnodes; ++inode )
             {
                 beamDynGetNode0InitialPosition( &inode, posi, crvi );
                 for(int i=0; i < 3; ++i) {
-                    (*pos0_ptr)[inode][i] = posi[i];
-                    (*crv0_ptr)[inode][i] = crvi[i];
+                    (*pos0_ptr)[inode][i] = posi[OFtoIEC[i]];
+                    (*crv0_ptr)[inode][i] = crvi[OFtoIEC[i]];
                 }
                 Info<< " " << posi[0] 
                     << " " << posi[1] 
@@ -450,7 +450,7 @@ namespace BD
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
-            if (first) Info<< "Initial displacements from BeamDyn lib (IEC corods) [m,deg]: " << endl;
+            if (first) Info<< "Initial configuration from BeamDyn lib (OpenFOAM coordinates) [m,deg]: " << endl;
             //else dispFile << currentTime;
             else posFile << currentTime;
 
@@ -466,7 +466,9 @@ namespace BD
                 // NOTE: THESE ARE IN IEC COORDINATES
 //                beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
-                // pos, disp, and adisp are saved in OF coordinates
+                //**********************************************************
+                // pos, crv, disp, and adisp are saved in OF coordinates!!!
+                //**********************************************************
                 for( int i=0; i<3; ++i )
                 {
                     pos[inode].component(i)   =  cur_pos[OFtoIEC[i]];
@@ -499,7 +501,8 @@ namespace BD
                         << " " << pos[inode][2]
                         << " " << crvToRad(crv[inode][0])*radToDeg
                         << " " << crvToRad(crv[inode][1])*radToDeg
-                        << " " << crvToRad(crv[inode][2])*radToDeg;
+                        << " " << crvToRad(crv[inode][2])*radToDeg
+                        << endl;
                 }
                 else // write subsequent displacements to file
                 {
@@ -519,9 +522,7 @@ namespace BD
 
             }// loop over beam nodes
 
-            if (first) Info<< endl;
-            //else dispFile << std::endl;
-            else posFile << std::endl;
+            if (!first) posFile << std::endl;
 
         }// if Pstream::master
 
@@ -969,23 +970,29 @@ namespace BD
 //    }/*}}}*/
 
     // crv should be interpolated and in the OpenFOAM ref frame
-    void rotateVector(vector v, const vector crv)
+    void rotateVector(vector& v, const vector crv)
     {
         vector v0(v);
         double R[9], dblCrv[3];
         for( int i=0; i<3; ++i ) { dblCrv[i] = crv[i]; }
 
         // dblCrv is in IEC coords
+        //Info<< "initial vector : " << v << endl;
+        //Info<< "rotation parameters : " << dblCrv[0] << " " << dblCrv[1] << " " << dblCrv[2] << endl;
         beamDynGetRotationMatrix(R,dblCrv);
 
+        //Info<< "rotate " << v0 << endl; // --VERIFIED: v0 is non-zero and initialized to v
         for( int i=0; i<3; ++i )
         {
             v[i] = 0;
             for( int j=0; j<3; ++j )
             {
+                //Info<< " " << R[3*i+j];
                 v[i] += R[3*i+j]*v0[j];
             }
+            //Info<< endl;
         }
+        //Info<< "final vector : " << v << endl;
     }
 
 } // end of BD namespace
