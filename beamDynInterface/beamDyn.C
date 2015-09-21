@@ -669,7 +669,7 @@ namespace BD
         p_ptr  = new vectorList(nSurfNodes, vector::zero);
 //        x1_ptr = new vectorList(nSurfNodes, vector::zero);
 
-        std::string fname = createFname("dispVectors.dat");
+        std::string fname = createFname("surfaceDisplacementVectors.dat");
 
         // read if restart
         if( restarted ) 
