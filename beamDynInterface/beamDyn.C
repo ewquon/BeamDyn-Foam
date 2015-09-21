@@ -81,7 +81,7 @@ namespace BD
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
                 //dispFile.open("rel_disp.out", std::ios::in | std::ios::out | std::ios::app);
                 posFile.open("position.out", std::ios::in | std::ios::out | std::ios::app);
-                trackFile.open("trackedPoints.out", std::ios::in | std::ios::out | std::ios::app);
+                //trackFile.open("trackedPoints.out", std::ios::in | std::ios::out | std::ios::app);
 
             }
             else
@@ -91,12 +91,12 @@ namespace BD
                 loadFile.open("load.out", std::ios::out);
                 //dispFile.open("rel_disp.out", std::ios::out);
                 posFile.open("position.out", std::ios::out);
-                trackFile.open("trackedPoints.out", std::ios::out);
+                //trackFile.open("trackedPoints.out", std::ios::out);
             }
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
             //if (!dispFile.is_open()) Info<< "Problem opening rel_disp.out???" << endl;
             if (!posFile.is_open()) Info<< "Problem opening position.out???" << endl;
-            if (!trackFile.is_open()) Info<< "Problem opening trackedPoints.out???" << endl;
+            //if (!trackFile.is_open()) Info<< "Problem opening trackedPoints.out???" << endl;
 
             //Info<< "Setting precision to " << std::numeric_limits<double>::digits10 << endl;
             //loadFile.precision(std::numeric_limits<double>::digits10);
@@ -104,7 +104,7 @@ namespace BD
             loadFile.precision(8);
             //dispFile.precision(8);
             posFile.precision(8);
-            trackFile.precision(8);
+            //trackFile.precision(8);
 
             // get initial configuration (IN IEC COORDINATES)
             double posi[3], crvi[3];
@@ -241,7 +241,8 @@ namespace BD
         {
             idx = trackedPts.toc()[ptI];
             (*trackedPts_ptr)[ptI] = idx;
-            Info<< ptI << " : " << idx << " " << mesh.points()[idx] << endl;
+            //Info<< ptI << " : " << idx << " " << mesh.points()[idx] << endl;
+            Pout<< ptI << " : " << idx << " " << mesh.points()[idx] << endl;
         }
 
     }
@@ -273,7 +274,7 @@ namespace BD
             loadFile.close();
             //dispFile.close();
             posFile.close();
-            trackFile.close();
+            //trackFile.close();
         }
     }
 
@@ -287,18 +288,25 @@ namespace BD
         currentTime = t; // do we really need to save this?
         currentDeltaT = dt;
 
+        label idx;
+        forAll( *trackedPts_ptr, ptI )
+        {
+            idx = (*trackedPts_ptr)[ptI];
+            Pout<< "tracked pt " << idx << " : " << mesh.points()[idx] << endl;
+        }
+
         if(Pstream::master()) 
         {
             // output tracked point positions for the current time step
-            trackFile << t;
-            forAll( *trackedPts_ptr, ptI )
-            {
-                for( int i=0; i<3; ++i )
-                {
-                    trackFile << " " << mesh.points()[ (*trackedPts_ptr)[ptI] ][i];
-                }
-            }
-            trackFile << std::endl;
+//            trackFile << t;
+//            forAll( *trackedPts_ptr, ptI )
+//            {
+//                for( int i=0; i<3; ++i )
+//                {
+//                    trackFile << " " << mesh.points()[ (*trackedPts_ptr)[ptI] ][i];
+//                }
+//            }
+//            trackFile << std::endl;
 
             // update the beam state
             beamDynStep( &dt ); // NOTE: dt isn't actually used!
