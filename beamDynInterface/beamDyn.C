@@ -436,8 +436,8 @@ namespace BD
         //vectorList &rot0 = *rot0_ptr; // not used
         vectorList &pos  = *pos_ptr;
         vectorList &crv  = *crv_ptr;
-        //vectorList &disp = *disp_ptr; // not used
-        //vectorList &adisp= *adisp_ptr; // not used
+        vectorList &disp = *disp_ptr;
+        vectorList &adisp= *adisp_ptr;
 
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
@@ -449,7 +449,7 @@ namespace BD
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             //   TODO: handle multiple elements
             double cur_pos[3], cur_crv[3]; // note: orientation information (cur_crv) is not used
-//            double lin_disp[3], ang_disp[3];
+            double lin_disp[3], ang_disp[3];
             for( int inode=0; inode<nnodes; ++inode ) 
             {
                 beamDynGetNode0Position( &inode, cur_pos, cur_crv );
@@ -463,8 +463,8 @@ namespace BD
                 {
                     pos[inode].component(i)   =  cur_pos[OFtoIEC[i]];
                     crv[inode].component(i)   =  cur_crv[OFtoIEC[i]];
- //                   disp[inode].component(i)  = lin_disp[OFtoIEC[i]];
- //                   adisp[inode].component(i) = ang_disp[OFtoIEC[i]];
+                    disp[inode].component(i)  = lin_disp[OFtoIEC[i]];
+                    adisp[inode].component(i) = ang_disp[OFtoIEC[i]];
                 }
 
                 // used for sectional loads calculation
@@ -491,8 +491,7 @@ namespace BD
                         << " " << pos[inode][2]
                         << " " << crvToRad(crv[inode][0])*radToDeg
                         << " " << crvToRad(crv[inode][1])*radToDeg
-                        << " " << crvToRad(crv[inode][2])*radToDeg
-                        << endl;
+                        << " " << crvToRad(crv[inode][2])*radToDeg;
                 }
                 else // write subsequent displacements to file
                 {
@@ -525,6 +524,7 @@ namespace BD
 //        Pstream::scatter(disp); // needed for pointPatchField
 //        Pstream::scatter(adisp);// needed for pointPatchField
 
+        Info<< "Node positions/displacements updated from BeamDyn" << endl;
     } // end of updateNodePositions()
 
     //*********************************************************************************************
@@ -546,7 +546,7 @@ namespace BD
         scalarList &r = *r_ptr;
         if( bladeR0 < 0.0 ) bladeR0 = r[0];
         if( bladeR  < 0.0 ) bladeR  = r[nnodes-1];
-        Info<< "r: " << r << endl;
+        //Info<< "r: " << r << endl;
         //Pout<< "Blade span : " << bladeR0 << " " << bladeR << endl;
 
         int nSurfNodes = pf.size(); // number of local points on interface patch
@@ -566,7 +566,7 @@ namespace BD
 
             // read saved shape function
             std::ifstream ifile(fname, std::ios::in | std::ios::binary);
-            if( !ifile.is_open() )
+            if( ifile.is_open() )
             {
                 //ifile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
                 ifile.read( reinterpret_cast<char*>(h_ptr), 
@@ -581,7 +581,7 @@ namespace BD
         //
         // calculate shape functions
         //
-        Pout << "calculating shape functions for " << nSurfNodes << " surface nodes" << endl;/*{{{*/
+        Pout << "Calculating shape functions for " << nSurfNodes << " surface nodes" << endl;/*{{{*/
 
         // DEBUG
         scalar hmin( 9e9);
@@ -645,7 +645,7 @@ namespace BD
             hmax = max(hmax,hsum);
 
         }// loop over surface nodes
-        Pout<< "-- sum(h) : [ " << hmin << ", " << hmax << " ]" 
+        Pout<< " sum(h) : [ " << hmin << ", " << hmax << " ]" 
             << " for s : [ " << smin << ", " << smax << " ]"
             << endl;/*}}}*/
 
@@ -669,29 +669,53 @@ namespace BD
         p_ptr  = new vectorList(nSurfNodes, vector::zero);
 //        x1_ptr = new vectorList(nSurfNodes, vector::zero);
 
+        std::string fname = createFname("dispVectors.dat");
+
         // read if restart
         if( restarted ) 
         {
             Info<< "Skipping surface offset calculation for restarted simulation" << endl;
 
-            std::string fname = createFname("dispVectors.dat");
-            Foam::IFstream ifile(fname);
-            if(ifile)
+            bool success=0;
+            if( Pstream::master() )
             {
-                ifile >> (*p_ptr);
-//                ifile >> (*x1_ptr);
+                Foam::IFstream ifile(fname);
+                if(ifile)
+                {
+                    ifile >> (*p_ptr);
+    //                ifile >> (*x1_ptr);
+                    success=1;
+                }
+                else
+                {
+                    Info<< "Problem opening " << fname << "... " << endl;
+                }
+            }
+            if(success)
+            {
+                Pstream::scatter(*p_ptr);
                 return;
             }
-            Info<< "Problem opening " << fname << "... " << endl;
         }
 
         // calculate vectors
-        Pout << "calculating offsets for " << nSurfNodes << " surface nodes" << endl;
+        Pout << "Calculating offsets for " << nSurfNodes << " surface nodes" << endl;
         forAll( pf, ptI )
         {
             (*p_ptr)[ptI] = pf[ptI];
             (*p_ptr)[ptI][bladeDir] = 0;
  //           (*x1_ptr)[ptI][bladeDir] = pf[ptI].component(bladeDir);
+        }
+
+        Foam::OFstream ofile(fname);
+        if(ofile)
+        {
+            ofile << (*p_ptr);
+            return;
+        }
+        else
+        {
+            Info<< "Problem opening " << fname << " for writing... " << endl;
         }
     }
 

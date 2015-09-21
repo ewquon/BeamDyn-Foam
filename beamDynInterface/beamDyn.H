@@ -104,18 +104,19 @@ namespace BD
     label interfacePatchID() { return patchID; };
 
     //-used by boundary patch
-    vectorList& pos() { return *pos_ptr; };  // linear displacement --NOT USED
-    vectorList& crv() { return *crv_ptr; }; // angular displacement --NOT USED
-    //vectorList& linDisp() { return *disp_ptr; };  // linear displacement --NOT USED
-    //vectorList& angDisp() { return *adisp_ptr; }; // angular displacement --NOT USED
+    vectorList& pos() { return *pos_ptr; };  // linear displacement
+    vectorList& crv() { return *crv_ptr; }; // angular displacement
+    vectorList& linDisp() { return *disp_ptr; };  // linear displacement
+    vectorList& angDisp() { return *adisp_ptr; }; // angular displacement
     //scalarList& r() { return *r_ptr; };           // beam coordinate at beamdyn nodes --NOT USED
     double* h() { return h_ptr; };                // shape functions
     label N() { return nnodes; };                 // number of beamdyn nodes
     Switch enforce2D() { return twoD; };          // force 2D displacements
     label bladeDirection() { return bladeDir; };  // in OpenFOAM coordinates
-    label openfoamDir(label dir) { return IECtoOF[dir]; };
+    //label openfoamDir(label dir) { return IECtoOF[dir]; };
     vectorList& p() { return *p_ptr; };           // surface node offset
     vectorList& x1() { return *x1_ptr; };         // beam axis position
+    labelList& trackedPoints() { return *trackedPts_ptr; };
 
     //
     // utility functions

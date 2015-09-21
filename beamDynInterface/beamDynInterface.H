@@ -22,16 +22,17 @@ namespace BD
     //-used by boundary patch
     vectorList& pos();
     vectorList& crv();
-    //vectorList& linDisp();
-    //vectorList& angDisp();
+    vectorList& linDisp();
+    vectorList& angDisp();
     //scalarList& r();
     double* h();
     label N();
     Switch enforce2D();
     label bladeDirection();
-    label openfoamDir(label dir);
+    //label openfoamDir(label dir);
     vectorList& p();
     vectorList& x1();
+    labelList& trackedPoints();
 
     // member functions
 

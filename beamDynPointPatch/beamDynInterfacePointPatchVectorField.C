@@ -110,9 +110,11 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
 //    double minTwist=9e9, maxTwist=-9e9;
 
-    vector pos(vector::zero); // interpolated linear displacement
-    vector crv(vector::zero); // interpolated angular displacement
+    vector pos(vector::zero); // interpolated linear position
+    vector crv(vector::zero); // interpolated angular position
     vector p(vector::zero); // position vector from beam curve to a surface node
+    vector linDisp(vector::zero); // interpolated linear displacement
+    vector angDisp(vector::zero); // inteprolated angular displacement
 
     //- patch coordinates, if needed
     //const labelList& meshPoints = patch().meshPoints(); // returns polyPatch_.meshPoints(), i.e. node IDs
@@ -125,6 +127,8 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
     vectorList& posList = BD::pos(); // position of BD nodes in OpenFOAM coords
     vectorList& crvList = BD::crv(); // orientation of BD nodes in OpenFOAM coords
+    //vectorList& linDispList = BD::linDisp(); // position of BD nodes in OpenFOAM coords
+    //vectorList& angDispList = BD::angDisp(); // orientation of BD nodes in OpenFOAM coords
 
     vectorList& pList = BD::p();        // surface offset vector in OpenFOAM coords
     //vectorList& x1List = BD::x1();      // position vector along beam axis in OpenFOAM coords
@@ -137,12 +141,16 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
         // interpolate displacement from pre-calculated shape function
         pos = vector::zero; // in OpenFoam coords
         crv = vector::zero; // in OpenFoam coords
+        //linDisp = vector::zero;
+        //angDisp = vector::zero;
         for( int inode=0; inode<BD::N(); ++inode )
         {
             for( int i=0; i<3; ++i )
             {
                 pos.component(i) += BD::h()[ptI*BD::N()+inode] * posList[inode].component(i);
                 crv.component(i) += BD::h()[ptI*BD::N()+inode] * crvList[inode].component(i);
+                //linDisp.component(i) += BD::h()[ptI*BD::N()+inode] * linDispList[inode].component(i);
+                //angDisp.component(i) += BD::h()[ptI*BD::N()+inode] * angDispList[inode].component(i);
             }
         }
 
@@ -179,8 +187,10 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        Info<< " p: " << pList[ptI] << endl << endl;
 
         // new position is at x = pos + p
-        // pointDisplacement values are relative to the current deformed configuration
+        // pointDisplacement values are relative to the current deformed configuration (?)
         this->operator[](ptI) = pos + p - localPoints[ptI];
+
+//        this->operator[](ptI) = linDisp + p;
 
         // for testing
         if(BD::enforce2D()) this->operator[](ptI).component(BD::bladeDirection()) = 0.0;
@@ -191,9 +201,19 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
     } //loop over all (surface) nodes on patch
 
+    // DEBUG
+
 //    Info<< "- min/max twist : " 
 //        << minTwist*180.0/Foam::constant::mathematical::pi << " " 
 //        << maxTwist*180.0/Foam::constant::mathematical::pi << " deg" << endl;
+//    Info<< "- TEST: node coords, pt disp vec : " << localPoints[0] << " " << this->operator[](0) << endl;
+
+    label idx;
+    forAll(BD::trackedPoints(),ptI)
+    {
+        idx = BD::trackedPoints()[ptI];
+        Info<< "Tracked pt " << idx << " pos/disp : " << localPoints[idx] << " " << this->operator[](idx) << endl;
+    }
 
     fixedValuePointPatchField<vector>::updateCoeffs();
 }
