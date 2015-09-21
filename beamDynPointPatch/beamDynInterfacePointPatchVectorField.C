@@ -117,6 +117,10 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     vector linDisp(vector::zero); // interpolated linear displacement
     vector angDisp(vector::zero); // inteprolated angular displacement
 
+    vector deltaV(vector::zero); // change in position due to rotation
+    vector maxDeltaV(vector::zero); // change in position due to rotation
+    scalar maxDelta(0);
+
     //- patch coordinates, if needed
     //const labelList& meshPoints = patch().meshPoints(); // returns polyPatch_.meshPoints(), i.e. node IDs
     const pointField& localPoints = patch().localPoints(); // returns polyPatch_.localPoints(), i.e. DISPLACED node coords
@@ -167,7 +171,14 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 /////////////////////////////////////////////////////////////////////
         //BD::rotateVector( p, crv );     // rotates p, in OpenFoam coords
         BD::rotateVector( p, crv-crv0 );     // rotates p, in OpenFoam coords
+
         //Info<< "  rotation change " << p - pList[ptI] << endl;
+        deltaV = p - pList[ptI];
+        if( mag(deltaV) > maxDelta )
+        {
+            maxDelta = mag(deltaV);
+            maxDeltaV = deltaV;
+        }
 
 // simple rotation about x0-axis (in BD frame) with cross sections remaining planar/*{{{*/
 //        ang = a.component(BD::bladeDirection());
@@ -213,6 +224,8 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        << minTwist*180.0/Foam::constant::mathematical::pi << " " 
 //        << maxTwist*180.0/Foam::constant::mathematical::pi << " deg" << endl;
 //    Info<< "- TEST: node coords, pt disp vec : " << localPoints[0] << " " << this->operator[](0) << endl;
+
+    Info<< "  max deltaV due to rotation : " << maxDeltaV << endl;
 
     label idx;
     forAll(BD::trackedPoints(),ptI)
