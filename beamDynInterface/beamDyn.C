@@ -582,13 +582,15 @@ namespace BD
             Info<< "Skipping shape function calculation for restarted simulation" << endl;
 
             // read saved shape function
-            Foam::IFstream ifile(fname, Foam::IOstream::BINARY);
-            if( ifile )
+            //Foam::IFstream ifile(fname, Foam::IOstream::BINARY); // this does't write double arrays properly
+            std::ifstream ifile(fname.c_str(), std::ios::in | std::ios::binary);
+            if( ifile.is_open() )
             {
                 Info<< "Reading " << fname << endl;
-                //ifile.read( reinterpret_cast<char*>(h_ptr), 
-                //            std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
-                ifile >> (*h_ptr);
+                //ifile >> (*h_ptr);
+                ifile.read( reinterpret_cast<char*>(h_ptr), 
+                            std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
+                ifile.close();
 
                 return;
             }
@@ -667,10 +669,14 @@ namespace BD
             << endl;/*}}}*/
 
         // write shape functions
-        Foam::OFstream ofile(fname, Foam::IOstream::BINARY);
-        if( ofile )
+        //Foam::OFstream ofile(fname, Foam::IOstream::BINARY);
+        std::ofstream ofile(fname.c_str(), std::ios::out | std::ios::binary);
+        if( ofile.is_open() )
         {
-            ofile << (*h_ptr);
+            //ofile << (*h_ptr);
+            ofile.write( reinterpret_cast<const char*>(h_ptr),
+                         std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
+            ofile.close();
         }
         else
         {
