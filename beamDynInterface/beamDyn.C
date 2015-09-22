@@ -697,19 +697,16 @@ namespace BD
             Info<< "Skipping surface offset calculation for restarted simulation" << endl;
 
             bool success=0;
-            if( Pstream::master() )
+            Foam::IFstream ifile(fname, Foam::IOstream::BINARY);
+            if( ifile )
             {
-                Foam::IFstream ifile(fname, Foam::IOstream::BINARY);
-                if( ifile )
-                {
-                    ifile >> (*p_ptr);
-    //                ifile >> (*x1_ptr);
-                    success=1;
-                }
-                else
-                {
-                    Info<< "Problem opening " << fname << "... " << endl;
-                }
+                ifile >> (*p_ptr);
+//                ifile >> (*x1_ptr);
+                success=1;
+            }
+            else
+            {
+                Info<< "Problem opening " << fname << "... " << endl;
             }
             if(success)
             {
@@ -727,7 +724,7 @@ namespace BD
  //           (*x1_ptr)[ptI][bladeDir] = pf[ptI].component(bladeDir);
         }
 
-        Foam::OFstream ofile(fname,Foam::IOstream::BINARY);
+        Foam::OFstream ofile(fname, Foam::IOstream::BINARY);
         if(ofile)
         {
             ofile << (*p_ptr);
