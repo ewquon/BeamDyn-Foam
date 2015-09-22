@@ -53,6 +53,7 @@ namespace BD
 
                 //std::string rstFile("BeamDynState_" + Foam::Time::timeName(t0) + ".dat");
                 std::string rstFile(Foam::Time::timeName(t0) + "/BeamDynState.dat");
+                if( Pstream::parRun() ) rstFile = "processor0/" + rstFile;
                 if (FILE *file = fopen(rstFile.c_str(), "r"))
                 {
                     fclose(file);
@@ -421,6 +422,7 @@ namespace BD
 
         // states are stored in beamdyn (fortran) structures
         std::string fname(timeName + "/BeamDynState.dat");
+        if( Pstream::parRun() ) fname = "processor0/" + fname;
         beamDynWriteState( fname.c_str() );
 
         // latest vectorList of surface node offsets and positions along the beam axis
