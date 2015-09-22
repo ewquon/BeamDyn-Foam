@@ -244,7 +244,7 @@ namespace BD
             idx = trackedPts.toc()[ptI];
             (*trackedPts_ptr)[ptI] = idx;
             //Info<< ptI << " : " << idx << " " << mesh.points()[idx] << endl;
-            Pout<< ptI << " : " << idx << " " << mesh.points()[idx] << endl;
+            Pout<< "point " << idx << " : " << mesh.points()[idx] << endl;
         }
 
     }
@@ -297,10 +297,13 @@ namespace BD
             Pout<< "tracked pt (after mesh solve)" << idx << " : " << mesh.points()[idx] << endl;
         }
 
+        scalar minVol( min(mesh.V()).value() );
+        Pstream::gather(minVol, minOp<scalar>());
+
         if(Pstream::master()) 
         {
             // check mesh quality
-            Info<< "deformed mesh min volume : " << min( mesh.V() ).value() << endl;
+            Info<< "deformed mesh min volume : " << minVol << endl;
 
             // output tracked point positions for the current time step
 //            trackFile << t;

@@ -235,7 +235,7 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        << maxTwist*180.0/Foam::constant::mathematical::pi << " deg" << endl;
 //    Info<< "- TEST: node coords, pt disp vec : " << localPoints[0] << " " << this->operator[](0) << endl;
 
-    Pout<< "  max delta due to rotation : " << maxVector << endl;
+    //Pout<< "  max delta due to rotation : " << maxVector << endl;
 
     label idx;
     forAll(BD::trackedPoints(),ptI)
