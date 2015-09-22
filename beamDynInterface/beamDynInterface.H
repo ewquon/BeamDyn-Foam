@@ -32,7 +32,7 @@ namespace BD
     label bladeDirection();
     //label openfoamDir(label dir);
     vectorList& p();
-    vectorList& x1();
+    //vectorList& x1();
     labelList& trackedPoints();
 
     // member functions

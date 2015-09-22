@@ -56,6 +56,7 @@ namespace BD
                 if (FILE *file = fopen(rstFile.c_str(), "r"))
                 {
                     fclose(file);
+                    Info<< "Reading " << rstFile << endl;
                     beamDynReadState( rstFile.c_str() );
                     restarted = 1;
                 }
@@ -66,6 +67,7 @@ namespace BD
                     if (FILE *file = fopen(rstFile.c_str(), "r"))
                     {
                         fclose(file);
+                        Info<< "Reading " << rstFile << endl;
                         beamDynReadState( rstFile.c_str() );
                         restarted = 1;
                     }
@@ -297,6 +299,9 @@ namespace BD
 
         if(Pstream::master()) 
         {
+            // check mesh quality
+            Info<< "deformed mesh min volume : " << min( mesh.V() ).value() << endl;
+
             // output tracked point positions for the current time step
 //            trackFile << t;
 //            forAll( *trackedPts_ptr, ptI )
@@ -310,9 +315,7 @@ namespace BD
 
             // update the beam state
             beamDynStep( &dt ); // NOTE: dt isn't actually used!
-
-            // check mesh quality
-            Info<< "  deformed mesh min volume : " << min( mesh.V() ).value() << endl;
+            Info<< "\nBeamDyn solution advanced by dt=" << dt << endl;
         }
 //        Info<< "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << nl << endl;
         updateNodePositions();
@@ -418,14 +421,15 @@ namespace BD
         beamDynWriteState( fname.c_str() );
 
         // latest vectorList of surface node offsets and positions along the beam axis
-        fname = createFname("surfaceDisplacementVectors.dat");
-        Foam::OFstream ofile(fname);
-        if( ofile )
-        {
-            ofile << (*p_ptr);
-//            ofile << (*x1_ptr);
-        }
-        else Pout<< "WARNING error opening " << fname << endl;
+// NOTE: In the current implementation, p_ptr is calculated and written out only once at t=0
+//        fname = createFname("surfaceDisplacementVectors.dat");
+//        Foam::OFstream ofile(fname);
+//        if( ofile )
+//        {
+//            ofile << (*p_ptr);
+////            ofile << (*x1_ptr);
+//        }
+//        else Pout<< "WARNING error opening " << fname << endl;
     }
 
 
@@ -450,7 +454,7 @@ namespace BD
 //        Info<< "Retrieving node positions for the next iteration" << endl;
         if(Pstream::master())
         {
-            if (first) Info<< "Initial configuration from BeamDyn lib (OpenFOAM coordinates) [m,deg]: " << endl;
+            if (first) Info<< "Current configuration from BeamDyn lib (OpenFOAM coordinates) [m,deg]: " << endl;
             //else dispFile << currentTime;
             else posFile << currentTime;
 
@@ -529,10 +533,10 @@ namespace BD
 
         // verified that broadcast of vectorlists work
         Pstream::scatter(pos);
-        //Pstream::scatter(crv);
+        Pstream::scatter(crv);
         Pstream::scatter(r);    // needed for calculateShapeFunctions() and updateSectionLoads()
-//        Pstream::scatter(disp); // needed for pointPatchField
-//        Pstream::scatter(adisp);// needed for pointPatchField
+        Pstream::scatter(disp); // needed for pointPatchField
+        Pstream::scatter(adisp);// needed for pointPatchField
 
         Info<< "Node positions/displacements updated from BeamDyn" << endl;
     } // end of updateNodePositions()
@@ -578,9 +582,10 @@ namespace BD
             std::ifstream ifile(fname, std::ios::in | std::ios::binary);
             if( ifile.is_open() )
             {
+                Info<< "Reading " << fname << endl;
                 //ifile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
                 ifile.read( reinterpret_cast<char*>(h_ptr), 
-                            std::streamsize(nSurfNodes*sizeof(double)) );
+                            std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
                 ifile.close();
 
                 return;
@@ -664,7 +669,7 @@ namespace BD
         if( !ofile.is_open() ) Pout<< "WARNING error opening " << fname << endl;
         //ofile.write( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
         ofile.write( reinterpret_cast<const char*>(h_ptr), 
-                     std::streamsize(nSurfNodes*sizeof(double)) );
+                     std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
         ofile.close();
     }
 
@@ -689,7 +694,7 @@ namespace BD
             bool success=0;
             if( Pstream::master() )
             {
-                Foam::IFstream ifile(fname);
+                Foam::IFstream ifile(fname,Foam::IOstream::BINARY);
                 if(ifile)
                 {
                     ifile >> (*p_ptr);
@@ -717,7 +722,7 @@ namespace BD
  //           (*x1_ptr)[ptI][bladeDir] = pf[ptI].component(bladeDir);
         }
 
-        Foam::OFstream ofile(fname);
+        Foam::OFstream ofile(fname,Foam::IOstream::BINARY);
         if(ofile)
         {
             ofile << (*p_ptr);

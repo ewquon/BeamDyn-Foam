@@ -89,9 +89,9 @@ namespace BD
     vectorList  *adisp_ptr;             // angular displacement at beam nodes (IEC coords)
     
     // calculated at all t
-    vectorList  *x1_ptr;                // position vector along the beam (x1) axis
-                                        // - initial value calculated by calculateInitialDisplacementVectors()
-                                        // - updated every time step by beamDynInterfacePointPatchField::updateCoeffs()
+//    vectorList  *x1_ptr;                // position vector along the beam (x1) axis
+//                                        // - initial value calculated by calculateInitialDisplacementVectors()
+//                                        // - updated every time step by beamDynInterfacePointPatchField::updateCoeffs()
     scalarList  *r_ptr;                 // spanwise coordinates of beam nodes used to calculate shape functions
                                         // - calculated in updateNodePositions()
 
@@ -116,7 +116,7 @@ namespace BD
     label bladeDirection() { return bladeDir; };  // in OpenFOAM coordinates
     //label openfoamDir(label dir) { return IECtoOF[dir]; };
     vectorList& p() { return *p_ptr; };           // surface node offset
-    vectorList& x1() { return *x1_ptr; };         // beam axis position
+    //vectorList& x1() { return *x1_ptr; };         // beam axis position
     labelList& trackedPoints() { return *trackedPts_ptr; };
 
     //
