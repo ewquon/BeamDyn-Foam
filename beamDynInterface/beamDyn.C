@@ -579,14 +579,13 @@ namespace BD
             Info<< "Skipping shape function calculation for restarted simulation" << endl;
 
             // read saved shape function
-            std::ifstream ifile(fname, std::ios::in | std::ios::binary);
-            if( ifile.is_open() )
+            Foam::IFstream ifile(fname, Foam::IOstream::BINARY);
+            if( ifile )
             {
                 Info<< "Reading " << fname << endl;
-                //ifile.read( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
-                ifile.read( reinterpret_cast<char*>(h_ptr), 
-                            std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
-                ifile.close();
+                //ifile.read( reinterpret_cast<char*>(h_ptr), 
+                //            std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
+                ifile >> (*h_ptr);
 
                 return;
             }
@@ -665,12 +664,15 @@ namespace BD
             << endl;/*}}}*/
 
         // write shape functions
-        std::ofstream ofile(fname, std::ios::out | std::ios::binary);
-        if( !ofile.is_open() ) Pout<< "WARNING error opening " << fname << endl;
-        //ofile.write( reinterpret_cast<char*>(&h_ptr), sizeof(h_ptr) );
-        ofile.write( reinterpret_cast<const char*>(h_ptr), 
-                     std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
-        ofile.close();
+        Foam::OFstream ofile(fname, Foam::IOstream::BINARY);
+        if( ofile )
+        {
+            ofile << (*h_ptr);
+        }
+        else
+        {
+            Pout<< "WARNING error opening " << fname << endl;
+        }
     }
 
 
@@ -694,8 +696,8 @@ namespace BD
             bool success=0;
             if( Pstream::master() )
             {
-                Foam::IFstream ifile(fname,Foam::IOstream::BINARY);
-                if(ifile)
+                Foam::IFstream ifile(fname, Foam::IOstream::BINARY);
+                if( ifile )
                 {
                     ifile >> (*p_ptr);
     //                ifile >> (*x1_ptr);
