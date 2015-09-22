@@ -117,9 +117,9 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     vector linDisp(vector::zero); // interpolated linear displacement
     vector angDisp(vector::zero); // inteprolated angular displacement
 
-    vector deltaV(vector::zero); // change in position due to rotation
-    vector maxDeltaV(vector::zero); // change in position due to rotation
-    scalar maxDelta(0);
+    vector surfDelta(vector::zero); // change in surface position due to rotation
+    vector maxVector(vector::zero); // max change in surface position due to rotation
+    scalar maxValue(0);
 
     //- patch coordinates, if needed
     //const labelList& meshPoints = patch().meshPoints(); // returns polyPatch_.meshPoints(), i.e. node IDs
@@ -130,11 +130,11 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     //const polyMesh& mesh = this->dimensionedInternalField().mesh()();
     //const Time& t = mesh.time();
 
-    vectorList& posList = BD::pos(); // position of BD nodes in OpenFOAM coords
-    vectorList& crvList = BD::crv(); // orientation of BD nodes in OpenFOAM coords
-    vectorList& crv0List = BD::crv0(); // orientation of BD nodes in OpenFOAM coords
-    //vectorList& linDispList = BD::linDisp(); // position of BD nodes in OpenFOAM coords
-    //vectorList& angDispList = BD::angDisp(); // orientation of BD nodes in OpenFOAM coords
+    //vectorList& posList = BD::pos(); // position of BD nodes in OpenFOAM coords
+    //vectorList& crvList = BD::crv(); // orientation of BD nodes in OpenFOAM coords
+    //vectorList& crv0List = BD::crv0(); // orientation of BD nodes in OpenFOAM coords
+    vectorList& linDispList = BD::linDisp(); // position of BD nodes in OpenFOAM coords
+    vectorList& angDispList = BD::angDisp(); // orientation of BD nodes in OpenFOAM coords
 
     vectorList& pList = BD::p();        // surface offset vector in OpenFOAM coords
     //vectorList& x1List = BD::x1();      // position vector along beam axis in OpenFOAM coords
@@ -145,20 +145,20 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
     forAll(*this, ptI)
     {
         // interpolate displacement from pre-calculated shape function
-        pos = vector::zero; // in OpenFoam coords
-        crv = vector::zero; // in OpenFoam coords
-        crv0 = vector::zero;
-        //linDisp = vector::zero;
-        //angDisp = vector::zero;
+        //pos = vector::zero; // in OpenFoam coords
+        //crv = vector::zero; // in OpenFoam coords
+        //crv0 = vector::zero;
+        linDisp = vector::zero;
+        angDisp = vector::zero;
         for( int inode=0; inode<BD::N(); ++inode )
         {
             for( int i=0; i<3; ++i )
             {
-                pos.component(i)  += BD::h()[ptI*BD::N()+inode] *  posList[inode].component(i);
-                crv.component(i)  += BD::h()[ptI*BD::N()+inode] *  crvList[inode].component(i);
-                crv0.component(i) += BD::h()[ptI*BD::N()+inode] * crv0List[inode].component(i);
-                //linDisp.component(i) += BD::h()[ptI*BD::N()+inode] * linDispList[inode].component(i);
-                //angDisp.component(i) += BD::h()[ptI*BD::N()+inode] * angDispList[inode].component(i);
+                //pos.component(i)  += BD::h()[ptI*BD::N()+inode] *  posList[inode].component(i);
+                //crv.component(i)  += BD::h()[ptI*BD::N()+inode] *  crvList[inode].component(i);
+                //crv0.component(i) += BD::h()[ptI*BD::N()+inode] * crv0List[inode].component(i);
+                linDisp.component(i) += BD::h()[ptI*BD::N()+inode] * linDispList[inode].component(i);
+                angDisp.component(i) += BD::h()[ptI*BD::N()+inode] * angDispList[inode].component(i);
             }
         }
 
@@ -170,14 +170,15 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 // TODO: general rotations, retrieve rotation matrix -- need VABS...
 /////////////////////////////////////////////////////////////////////
         //BD::rotateVector( p, crv );     // rotates p, in OpenFoam coords
-        BD::rotateVector( p, crv-crv0 );     // rotates p, in OpenFoam coords
+        //BD::rotateVector( p, crv-crv0 );     // rotates p, in OpenFoam coords
+        BD::rotateVector( p, angDisp );     // rotates p, in OpenFoam coords
 
         //Info<< "  rotation change " << p - pList[ptI] << endl;
-        deltaV = p - pList[ptI];
-        if( mag(deltaV) > maxDelta )
+        surfDelta = p - pList[ptI];
+        if( mag(surfDelta) > maxValue )
         {
-            maxDelta = mag(deltaV);
-            maxDeltaV = deltaV;
+            maxValue = mag(surfDelta);
+            maxVector = surfDelta;
         }
 
 // simple rotation about x0-axis (in BD frame) with cross sections remaining planar/*{{{*/
@@ -205,9 +206,18 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 
         // new position is at x = pos + p
         // pointDisplacement values are relative to the current deformed configuration (?)
-        this->operator[](ptI) = pos + p - localPoints[ptI];
+//        this->operator[](ptI) = pos + p - localPoints[ptI];
 
-//        this->operator[](ptI) = linDisp + p;
+// DEBUG:
+// --This simple displacement test shows that the specified pointDisplacement is relative
+//   to the initial position...
+//   Sample output:
+//   Tracked pt 5522 cur pos/disp : (0.00010639 0.5 9.55978e-05) (0 0 0.0005)
+//   Tracked pt 5522 cur pos/disp : (0.00010639 0.5 0.000595598) (0 0 0.001)
+//   Tracked pt 5522 cur pos/disp : (0.00010639 0.5 0.0010956) ... 
+//        this->operator[](ptI) = vector(0,0,t.value());
+
+        this->operator[](ptI) = linDisp + surfDelta;
 
         // for testing
         if(BD::enforce2D()) this->operator[](ptI).component(BD::bladeDirection()) = 0.0;
@@ -225,7 +235,7 @@ void beamDynInterfacePointPatchVectorField::updateCoeffs()
 //        << maxTwist*180.0/Foam::constant::mathematical::pi << " deg" << endl;
 //    Info<< "- TEST: node coords, pt disp vec : " << localPoints[0] << " " << this->operator[](0) << endl;
 
-    Pout<< "  max deltaV due to rotation : " << maxDeltaV << endl;
+    Pout<< "  max delta due to rotation : " << maxVector << endl;
 
     label idx;
     forAll(BD::trackedPoints(),ptI)

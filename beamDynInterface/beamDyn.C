@@ -292,7 +292,7 @@ namespace BD
         forAll( *trackedPts_ptr, ptI )
         {
             idx = (*trackedPts_ptr)[ptI];
-            Pout<< "tracked pt " << idx << " : " << mesh.points()[idx] << endl;
+            Pout<< "tracked pt (after mesh solve)" << idx << " : " << mesh.points()[idx] << endl;
         }
 
         if(Pstream::master()) 
@@ -460,11 +460,12 @@ namespace BD
             double lin_disp[3], ang_disp[3];
             for( int inode=0; inode<nnodes; ++inode ) 
             {
+                // NOTE: THESE ARE IN IEC COORDINATES
                 beamDynGetNode0Position( &inode, cur_pos, cur_crv );
 
                 // get node linear/angular displacement [m, crv]
                 // NOTE: THESE ARE IN IEC COORDINATES
-//                beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
+                beamDynGetNode0Displacement( &inode, lin_disp, ang_disp );
 
                 //**********************************************************
                 // pos, crv, disp, and adisp are saved in OF coordinates!!!
