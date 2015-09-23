@@ -82,8 +82,8 @@ namespace BD
                 //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
-                //dispFile.open("rel_disp.out", std::ios::in | std::ios::out | std::ios::app);
-                posFile.open("position.out", std::ios::in | std::ios::out | std::ios::app);
+                dispFile.open("displacement.out", std::ios::in | std::ios::out | std::ios::app);
+                //posFile.open("position.out", std::ios::in | std::ios::out | std::ios::app);
                 //trackFile.open("trackedPoints.out", std::ios::in | std::ios::out | std::ios::app);
 
             }
@@ -92,22 +92,22 @@ namespace BD
                 //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::out);
-                //dispFile.open("rel_disp.out", std::ios::out);
-                posFile.open("position.out", std::ios::out);
+                dispFile.open("displacement.out", std::ios::out);
+                //posFile.open("position.out", std::ios::out);
                 //trackFile.open("trackedPoints.out", std::ios::out);
             }
 
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
-            //if (!dispFile.is_open()) Info<< "Problem opening rel_disp.out???" << endl;
-            if (!posFile.is_open()) Info<< "Problem opening position.out???" << endl;
+            if (!dispFile.is_open()) Info<< "Problem opening displacement.out???" << endl;
+            //if (!posFile.is_open()) Info<< "Problem opening position.out???" << endl;
             //if (!trackFile.is_open()) Info<< "Problem opening trackedPoints.out???" << endl;
 
             //Info<< "Setting precision to " << std::numeric_limits<double>::digits10 << endl;
             //loadFile.precision(std::numeric_limits<double>::digits10);
             //dispFile.precision(std::numeric_limits<double>::digits10);
             loadFile.precision(8);
-            //dispFile.precision(8);
-            posFile.precision(8);
+            dispFile.precision(8);
+            //posFile.precision(8);
             //trackFile.precision(8);
 
             // get initial configuration (IN IEC COORDINATES)
@@ -278,8 +278,8 @@ namespace BD
         if (Pstream::master())
         {
             loadFile.close();
-            //dispFile.close();
-            posFile.close();
+            dispFile.close();
+            //posFile.close();
             //trackFile.close();
         }
     }
@@ -462,8 +462,8 @@ namespace BD
         if(Pstream::master())
         {
             if (first) Info<< "Current configuration from BeamDyn lib (OpenFOAM coordinates) [m,deg]: " << endl;
-            //else dispFile << currentTime;
-            else posFile << currentTime;
+            else dispFile << currentTime;
+            //else posFile << currentTime;
 
             // --loop over nodes in the BeamDyn blade model (assumed single element)
             //   TODO: handle multiple elements
@@ -518,23 +518,24 @@ namespace BD
                 }
                 else // write subsequent displacements to file
                 {
-//                    dispFile << " " << disp[inode][0] 
-//                             << " " << disp[inode][1] 
-//                             << " " << disp[inode][2];
-//                    dispFile << " " << crvToRad(adisp[inode][0])*radToDeg 
-//                             << " " << crvToRad(adisp[inode][1])*radToDeg 
-//                             << " " << crvToRad(adisp[inode][2])*radToDeg;
-                    posFile << " " << pos[inode][0] 
-                            << " " << pos[inode][1] 
-                            << " " << pos[inode][2];
-                    posFile << " " << crvToRad(crv[inode][0])*radToDeg 
-                            << " " << crvToRad(crv[inode][1])*radToDeg 
-                            << " " << crvToRad(crv[inode][2])*radToDeg;
+                    dispFile << " " << disp[inode][0] 
+                             << " " << disp[inode][1] 
+                             << " " << disp[inode][2];
+                    dispFile << " " << crvToRad(adisp[inode][0])*radToDeg 
+                             << " " << crvToRad(adisp[inode][1])*radToDeg 
+                             << " " << crvToRad(adisp[inode][2])*radToDeg;
+//                    posFile << " " << pos[inode][0] 
+//                            << " " << pos[inode][1] 
+//                            << " " << pos[inode][2];
+//                    posFile << " " << crvToRad(crv[inode][0])*radToDeg 
+//                            << " " << crvToRad(crv[inode][1])*radToDeg 
+//                            << " " << crvToRad(crv[inode][2])*radToDeg;
                 }
 
             }// loop over beam nodes
 
-            if (!first) posFile << std::endl;
+            if (!first) dispFile << std::endl;
+            //if (!first) posFile << std::endl;
 
         }// if Pstream::master
 

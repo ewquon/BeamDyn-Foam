@@ -64,9 +64,9 @@ namespace BD
     bool restarted=false;
 
     std::fstream loadFile;
-    //std::fstream dispFile;
-    std::fstream posFile;
-    std::fstream trackFile;
+    std::fstream dispFile;
+    //std::fstream posFile;
+    //std::fstream trackFile;
 
     int nnodes=0;
     
