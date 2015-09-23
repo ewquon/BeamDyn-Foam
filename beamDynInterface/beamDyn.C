@@ -19,7 +19,7 @@ namespace BD
     {
         currentTime = t0;
         currentDeltaT = dt;
-        restarted = 0;
+        restarted = false;
 
         if (Pstream::master())
         {

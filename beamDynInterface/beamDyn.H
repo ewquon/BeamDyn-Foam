@@ -61,7 +61,7 @@ namespace BD
     scalar  pRef;
 
     bool first=true; // first iteration?
-    bool restarted=0;
+    bool restarted=false;
 
     std::fstream loadFile;
     //std::fstream dispFile;
