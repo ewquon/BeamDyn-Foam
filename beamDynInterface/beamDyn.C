@@ -298,14 +298,13 @@ namespace BD
             Pout<< "tracked pt (after mesh solve)" << idx << " : " << mesh.points()[idx] << endl;
         }
 
+        // check mesh quality
         scalar minVol( min(mesh.V()).value() );
         Pstream::gather(minVol, minOp<scalar>());
+        Info<< "deformed mesh min volume : " << minVol << endl;
 
         if(Pstream::master()) 
         {
-            // check mesh quality
-            Info<< "deformed mesh min volume : " << minVol << endl;
-
             // output tracked point positions for the current time step
 //            trackFile << t;
 //            forAll( *trackedPts_ptr, ptI )
@@ -537,9 +536,9 @@ namespace BD
         }// if Pstream::master
 
         // verified that broadcast of vectorlists work
+        Pstream::scatter(r);    // needed for calculateShapeFunctions() and updateSectionLoads()
         Pstream::scatter(pos);
         Pstream::scatter(crv);
-        Pstream::scatter(r);    // needed for calculateShapeFunctions() and updateSectionLoads()
         Pstream::scatter(disp); // needed for pointPatchField
         Pstream::scatter(adisp);// needed for pointPatchField
 
@@ -711,15 +710,11 @@ namespace BD
                 ifile >> (*p_ptr);
 //                ifile >> (*x1_ptr);
                 success=1;
+                return;
             }
             else
             {
                 Info<< "Problem opening " << fname << "... " << endl;
-            }
-            if(success)
-            {
-                Pstream::scatter(*p_ptr);
-                return;
             }
         }
 
