@@ -590,7 +590,7 @@ namespace BD
             std::ifstream ifile(fname.c_str(), std::ios::in | std::ios::binary);
             if( ifile.is_open() )
             {
-                Info<< "Reading " << fname << endl;
+                Pout<< "Reading " << fname << endl;
                 //ifile >> (*h_ptr);
                 ifile.read( reinterpret_cast<char*>(h_ptr), 
                             std::streamsize(nSurfNodes*nnodes*sizeof(double)) );
@@ -709,6 +709,7 @@ namespace BD
             Foam::IFstream ifile(fname, Foam::IOstream::BINARY);
             if( ifile )
             {
+                Pout<< "Reading " << fname << endl;
                 ifile >> (*p_ptr);
 //                ifile >> (*x1_ptr);
                 return;
