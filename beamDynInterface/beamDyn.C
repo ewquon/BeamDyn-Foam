@@ -703,13 +703,11 @@ namespace BD
         {
             Info<< "Skipping surface offset calculation for restarted simulation" << endl;
 
-            bool success=0;
             Foam::IFstream ifile(fname, Foam::IOstream::BINARY);
             if( ifile )
             {
                 ifile >> (*p_ptr);
 //                ifile >> (*x1_ptr);
-                success=1;
                 return;
             }
             else
