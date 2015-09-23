@@ -96,6 +96,9 @@ namespace BD
                 posFile.open("position.out", std::ios::out);
                 //trackFile.open("trackedPoints.out", std::ios::out);
             }
+
+            Pstream::scatter(restarted);
+
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
             //if (!dispFile.is_open()) Info<< "Problem opening rel_disp.out???" << endl;
             if (!posFile.is_open()) Info<< "Problem opening position.out???" << endl;
