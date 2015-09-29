@@ -47,9 +47,9 @@ namespace BD
         // open disp.out and load.out for writing later
         if(Pstream::master())
         {
-            if (t0 > 0)
-            {
-                Info<< "Attempting restart from previous time = " << t0 << endl;
+//            if (t0 > 0)
+//            {
+//                Info<< "Attempting restart from previous time = " << t0 << endl;
 
                 //std::string rstFile("BeamDynState_" + Foam::Time::timeName(t0) + ".dat");
                 std::string rstFile(Foam::Time::timeName(t0) + "/BeamDynState.dat");
@@ -57,9 +57,8 @@ namespace BD
                 if (FILE *file = fopen(rstFile.c_str(), "r"))
                 {
                     fclose(file);
-                    Info<< "Reading " << rstFile << endl;
-                    beamDynReadState( rstFile.c_str() );
-                    restarted = 1;
+                    Info<< "Found restart file " << rstFile << endl;
+                    beamDynReadState( rstFile.c_str(), &restarted );
                 }
 
                 if( !restarted ) // try different restart file
@@ -68,17 +67,22 @@ namespace BD
                     if (FILE *file = fopen(rstFile.c_str(), "r"))
                     {
                         fclose(file);
-                        Info<< "Reading " << rstFile << endl;
-                        beamDynReadState( rstFile.c_str() );
-                        restarted = 1;
+                        Info<< "Found restart file " << rstFile << endl;
+                        beamDynReadState( rstFile.c_str(), &restarted );
                     }
                 }
 
-                if( !restarted ) 
+                if( t0 > 0 && !restarted ) 
                 {
-                    Info<< "Problem opening restart file " << rstFile << endl;
+                    Info<< "Problem opening restart file " << rstFile << " for t>0" << endl;
+                }
+                else
+                {
+                    Info<< "Restart read from " << rstFile << " was successful" << endl;
                 }
 
+            if (t0 > 0)
+            {
                 //***these outputs are in OpenFOAM coordinates***
                 // angles are in degrees
                 loadFile.open("load.out", std::ios::in | std::ios::out | std::ios::app);
@@ -96,7 +100,6 @@ namespace BD
                 //posFile.open("position.out", std::ios::out);
                 //trackFile.open("trackedPoints.out", std::ios::out);
             }
-
             if (!loadFile.is_open()) Info<< "Problem opening load.out???" << endl;
             if (!dispFile.is_open()) Info<< "Problem opening displacement.out???" << endl;
             //if (!posFile.is_open()) Info<< "Problem opening position.out???" << endl;

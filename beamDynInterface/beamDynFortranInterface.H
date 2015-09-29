@@ -18,7 +18,7 @@ extern "C"
     void beamDynStep( double *dt_foam );
 
     void beamDynWriteState( const char *fname );
-    void beamDynReadState( const char *fname );
+    void beamDynReadState( const char *fname, int *istat );
 
     //
     // set functions
